@@ -37,5 +37,5 @@ export type Duty = {
 
 export type DutyWithRelations = Duty & {
   staff: Staff | null;
-  department: Department | null;
+  departments: Department | null;
 };

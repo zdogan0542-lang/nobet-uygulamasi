@@ -1,19 +1,5 @@
 import { useMemo } from 'react';
-import {
-  CalendarCheck,
-  Users,
-  Clock,
-  Activity,
-  TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
-  Calendar,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Loader2,
-  AlertTriangle,
-} from 'lucide-react';
+import { CalendarCheck, Users, Clock, Activity, TrendingUp, TrendingDown, ArrowUpRight, Calendar, CircleCheck as CheckCircle2, Circle as XCircle, CircleAlert as AlertCircle, Loader as Loader2, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import type { DutyWithRelations } from '@/lib/supabase';
 
@@ -275,7 +261,7 @@ export default function Dashboard() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{staffName}</p>
                         <p className="text-xs text-gray-400">
-                          {duty.department?.name ?? '—'} · {formatTimeRange(duty.start_time, duty.end_time)}
+                          {duty.departments?.name ?? '—'} · {formatTimeRange(duty.start_time, duty.end_time)}
                         </p>
                       </div>
                       <span className="text-sm text-gray-500 hidden sm:block">{formatDate(duty.duty_date)}</span>

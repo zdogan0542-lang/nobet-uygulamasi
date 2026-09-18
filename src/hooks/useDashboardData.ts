@@ -30,7 +30,7 @@ export function useDashboardData(): DashboardData {
           supabase.from('staff').select('*').order('full_name'),
           supabase
             .from('duties')
-            .select('*, staff(*), department(*)')
+            .select('*, staff(*), departments(*)')
             .order('duty_date', { ascending: true })
             .order('start_time', { ascending: true }),
         ]);
@@ -43,8 +43,13 @@ export function useDashboardData(): DashboardData {
         setStaff(staffData ?? []);
         setDuties((dutyData ?? []) as DutyWithRelations[]);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Veriler yüklenirken bir hata oluştu';
-        setError(msg);
+        if (err instanceof Error) {
+          setError(err.message);
+        } else if (typeof err === 'object' && err !== null && 'message' in err) {
+          setError(String((err as { message: unknown }).message));
+        } else {
+          setError('Veriler yüklenirken bir hata oluştu');
+        }
       } finally {
         setLoading(false);
       }
