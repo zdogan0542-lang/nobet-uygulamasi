@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Calendar,
@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 type NavItem = {
   label: string;
@@ -18,16 +19,30 @@ type NavItem = {
   badge?: string;
 };
 
-const navItems: NavItem[] = [
-  { label: 'Genel Bakış', icon: LayoutDashboard, active: true },
-  { label: 'Nöbet Çizelgesi', icon: Calendar, badge: '3' },
-  { label: 'Personel', icon: Users },
-  { label: 'Raporlar', icon: FileBarChart },
-  { label: 'Ayarlar', icon: Settings },
-];
-
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    async function fetchPending() {
+      const { count, error } = await supabase
+        .from('duties')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'missed');
+      if (!error && count !== null) {
+        setPendingCount(count);
+      }
+    }
+    fetchPending();
+  }, []);
+
+  const navItems: NavItem[] = [
+    { label: 'Genel Bakış', icon: LayoutDashboard, active: true },
+    { label: 'Nöbet Çizelgesi', icon: Calendar, badge: pendingCount > 0 ? String(pendingCount) : undefined },
+    { label: 'Personel', icon: Users },
+    { label: 'Raporlar', icon: FileBarChart },
+    { label: 'Ayarlar', icon: Settings },
+  ];
 
   return (
     <aside
@@ -69,7 +84,7 @@ export default function Sidebar() {
                 <span className="flex-1 text-left animate-fade-in">{item.label}</span>
               )}
               {!collapsed && item.badge && (
-                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-brand-100 text-brand-700 animate-fade-in">
+                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-rose-100 text-rose-700 animate-fade-in">
                   {item.badge}
                 </span>
               )}

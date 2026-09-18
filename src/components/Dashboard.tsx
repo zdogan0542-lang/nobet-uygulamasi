@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   CalendarCheck,
   Users,
@@ -10,80 +11,167 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
+  Loader2,
+  AlertTriangle,
 } from 'lucide-react';
-
-type Stat = {
-  label: string;
-  value: string;
-  change: string;
-  trend: 'up' | 'down';
-  icon: typeof CalendarCheck;
-  color: string;
-  bgColor: string;
-};
-
-const stats: Stat[] = [
-  {
-    label: 'Bu Haftaki Nöbetler',
-    value: '24',
-    change: '+12%',
-    trend: 'up',
-    icon: CalendarCheck,
-    color: 'text-brand-600',
-    bgColor: 'bg-brand-50',
-  },
-  {
-    label: 'Aktif Personel',
-    value: '38',
-    change: '+3',
-    trend: 'up',
-    icon: Users,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50',
-  },
-  {
-    label: 'Bekleyen Nöbetler',
-    value: '6',
-    change: '-2',
-    trend: 'down',
-    icon: Clock,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50',
-  },
-  {
-    label: 'Doluluk Oranı',
-    value: '87%',
-    change: '+5%',
-    trend: 'up',
-    icon: Activity,
-    color: 'text-rose-600',
-    bgColor: 'bg-rose-50',
-  },
-];
-
-type Duty = {
-  staff: string;
-  department: string;
-  date: string;
-  time: string;
-  status: 'active' | 'upcoming' | 'missed';
-};
-
-const duties: Duty[] = [
-  { staff: 'Dr. Mehmet Kaya', department: 'Acil', date: '18 Eyl', time: '08:00 - 20:00', status: 'active' },
-  { staff: 'Hm. Fatma Demir', department: 'Yoğun Bakım', date: '18 Eyl', time: '20:00 - 08:00', status: 'upcoming' },
-  { staff: 'Dr. Can Öztürk', department: 'Cerrahi', date: '19 Eyl', time: '08:00 - 20:00', status: 'upcoming' },
-  { staff: 'Hm. Elif Şahin', department: 'Dahiliye', date: '19 Eyl', time: '20:00 - 08:00', status: 'upcoming' },
-  { staff: 'Dr. Burak Aydın', department: 'Acil', date: '20 Eyl', time: '08:00 - 20:00', status: 'missed' },
-];
+import { useDashboardData } from '@/hooks/useDashboardData';
+import type { DutyWithRelations } from '@/lib/supabase';
 
 const statusConfig = {
   active: { label: 'Devam Ediyor', icon: CheckCircle2, cls: 'bg-emerald-50 text-emerald-700' },
   upcoming: { label: 'Planlandı', icon: AlertCircle, cls: 'bg-brand-50 text-brand-700' },
   missed: { label: 'Boş', icon: XCircle, cls: 'bg-rose-50 text-rose-700' },
-};
+  completed: { label: 'Tamamlandı', icon: CheckCircle2, cls: 'bg-gray-100 text-gray-600' },
+} as const;
+
+const TR_MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getDate()} ${TR_MONTHS[d.getMonth()]}`;
+}
+
+function formatTimeRange(start: string, end: string): string {
+  const fmt = (t: string) => t.slice(0, 5);
+  return `${fmt(start)} - ${fmt(end)}`;
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 export default function Dashboard() {
+  const { staff, departments, duties, loading, error } = useDashboardData();
+
+  const stats = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const weekEnd = new Date();
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekEndStr = weekEnd.toISOString().slice(0, 10);
+
+    const thisWeekDuties = duties.filter(
+      (d) => d.duty_date >= today && d.duty_date <= weekEndStr
+    );
+    const activeStaff = staff.filter((s) => s.active);
+    const pendingDuties = duties.filter((d) => d.status === 'upcoming');
+    const filledDuties = thisWeekDuties.filter((d) => d.status !== 'missed');
+    const occupancyRate =
+      thisWeekDuties.length > 0
+        ? Math.round((filledDuties.length / thisWeekDuties.length) * 100)
+        : 0;
+
+    return [
+      {
+        label: 'Bu Haftaki Nöbetler',
+        value: String(thisWeekDuties.length),
+        change: '+12%',
+        trend: 'up' as const,
+        icon: CalendarCheck,
+        color: 'text-brand-600',
+        bgColor: 'bg-brand-50',
+      },
+      {
+        label: 'Aktif Personel',
+        value: String(activeStaff.length),
+        change: '+3',
+        trend: 'up' as const,
+        icon: Users,
+        color: 'text-emerald-600',
+        bgColor: 'bg-emerald-50',
+      },
+      {
+        label: 'Bekleyen Nöbetler',
+        value: String(pendingDuties.length),
+        change: '-2',
+        trend: 'down' as const,
+        icon: Clock,
+        color: 'text-amber-600',
+        bgColor: 'bg-amber-50',
+      },
+      {
+        label: 'Doluluk Oranı',
+        value: `${occupancyRate}%`,
+        change: '+5%',
+        trend: 'up' as const,
+        icon: Activity,
+        color: 'text-rose-600',
+        bgColor: 'bg-rose-50',
+      },
+    ];
+  }, [staff, duties]);
+
+  const upcomingDuties = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return duties
+      .filter((d) => d.duty_date >= today && d.status !== 'completed')
+      .slice(0, 8);
+  }, [duties]);
+
+  const deptBreakdown = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const weekEnd = new Date();
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekEndStr = weekEnd.toISOString().slice(0, 10);
+
+    const counts = departments.map((dept) => {
+      const count = duties.filter(
+        (d) =>
+          d.department_id === dept.id &&
+          d.duty_date >= today &&
+          d.duty_date <= weekEndStr
+      ).length;
+      return { dept: dept.name, count, color: dept.color };
+    });
+
+    const maxCount = Math.max(...counts.map((c) => c.count), 1);
+    return counts
+      .map((c) => ({ ...c, pct: Math.round((c.count / maxCount) * 100) }))
+      .sort((a, b) => b.count - a.count);
+  }, [departments, duties]);
+
+  const totalThisWeek = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const weekEnd = new Date();
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekEndStr = weekEnd.toISOString().slice(0, 10);
+    const weekDuties = duties.filter(
+      (d) => d.duty_date >= today && d.duty_date <= weekEndStr
+    );
+    const filled = weekDuties.filter((d) => d.status !== 'missed').length;
+    return { total: weekDuties.length, filled };
+  }, [duties]);
+
+  const today = new Date();
+  const todayStr = `${today.getDate()} Eylül ${today.getFullYear()}, ${['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'][today.getDay()]}`;
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-brand-600 animate-spin mx-auto" />
+          <p className="mt-3 text-sm text-gray-500">Veriler yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md">
+          <AlertTriangle className="w-10 h-10 text-rose-500 mx-auto" />
+          <p className="mt-3 text-sm font-medium text-gray-900">Veriler yüklenemedi</p>
+          <p className="mt-1 text-sm text-gray-500">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50 bg-grid-pattern">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
@@ -96,7 +184,7 @@ export default function Dashboard() {
             <div className="relative">
               <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-white text-xs font-medium backdrop-blur-sm">
                 <Calendar className="w-3.5 h-3.5" />
-                18 Eylül 2026, Cuma
+                {todayStr}
               </span>
               <h1 className="mt-4 text-3xl sm:text-4xl font-bold text-white tracking-tight">
                 Nöbet Takip Sistemi
@@ -157,7 +245,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div>
                 <h2 className="text-base font-semibold text-gray-900">Yaklaşan Nöbetler</h2>
-                <p className="text-sm text-gray-400">Sonraki 5 günün nöbet planı</p>
+                <p className="text-sm text-gray-400">Sonraki 7 günün nöbet planı</p>
               </div>
               <button className="text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors flex items-center gap-1">
                 Tümünü Gör
@@ -165,30 +253,40 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="divide-y divide-gray-50">
-              {duties.map((duty, i) => {
-                const cfg = statusConfig[duty.status];
-                const StatusIcon = cfg.icon;
-                return (
-                  <div
-                    key={i}
-                    className="flex items-center gap-4 px-6 py-3.5 hover:bg-gray-50 transition-colors animate-fade-in opacity-0"
-                    style={{ animationDelay: `${i * 50}ms` }}
-                  >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-gray-600 text-xs font-bold shrink-0">
-                      {duty.staff.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+              {upcomingDuties.length === 0 ? (
+                <div className="px-6 py-12 text-center">
+                  <Calendar className="w-8 h-8 text-gray-300 mx-auto" />
+                  <p className="mt-2 text-sm text-gray-400">Yaklaşan nöbet bulunmuyor</p>
+                </div>
+              ) : (
+                upcomingDuties.map((duty: DutyWithRelations, i) => {
+                  const cfg = statusConfig[duty.status] ?? statusConfig.upcoming;
+                  const StatusIcon = cfg.icon;
+                  const staffName = duty.staff?.full_name ?? 'Atanmamış';
+                  return (
+                    <div
+                      key={duty.id}
+                      className="flex items-center gap-4 px-6 py-3.5 hover:bg-gray-50 transition-colors animate-fade-in opacity-0"
+                      style={{ animationDelay: `${i * 50}ms` }}
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-gray-600 text-xs font-bold shrink-0">
+                        {getInitials(staffName)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{staffName}</p>
+                        <p className="text-xs text-gray-400">
+                          {duty.department?.name ?? '—'} · {formatTimeRange(duty.start_time, duty.end_time)}
+                        </p>
+                      </div>
+                      <span className="text-sm text-gray-500 hidden sm:block">{formatDate(duty.duty_date)}</span>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.cls}`}>
+                        <StatusIcon className="w-3 h-3" />
+                        {cfg.label}
+                      </span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{duty.staff}</p>
-                      <p className="text-xs text-gray-400">{duty.department} · {duty.time}</p>
-                    </div>
-                    <span className="text-sm text-gray-500 hidden sm:block">{duty.date}</span>
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.cls}`}>
-                      <StatusIcon className="w-3 h-3" />
-                      {cfg.label}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -197,12 +295,7 @@ export default function Dashboard() {
             <h2 className="text-base font-semibold text-gray-900">Bölüm Dağılımı</h2>
             <p className="text-sm text-gray-400 mb-5">Bu haftaki nöbet sayısı</p>
             <div className="space-y-4">
-              {[
-                { dept: 'Acil', count: 8, pct: 80, color: 'bg-brand-500' },
-                { dept: 'Yoğun Bakım', count: 6, pct: 60, color: 'bg-emerald-500' },
-                { dept: 'Cerrahi', count: 5, pct: 50, color: 'bg-amber-500' },
-                { dept: 'Dahiliye', count: 5, pct: 50, color: 'bg-rose-500' },
-              ].map((row, i) => (
+              {deptBreakdown.map((row, i) => (
                 <div key={row.dept} className="animate-fade-in opacity-0" style={{ animationDelay: `${i * 70}ms` }}>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-sm font-medium text-gray-700">{row.dept}</span>
@@ -210,8 +303,8 @@ export default function Dashboard() {
                   </div>
                   <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
                     <div
-                      className={`h-full ${row.color} rounded-full transition-all duration-700`}
-                      style={{ width: `${row.pct}%` }}
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${row.pct}%`, backgroundColor: row.color }}
                     />
                   </div>
                 </div>
@@ -220,11 +313,14 @@ export default function Dashboard() {
             <div className="mt-6 pt-5 border-t border-gray-100">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500">Toplam Nöbet</span>
-                <span className="text-lg font-bold text-gray-900">24</span>
+                <span className="text-lg font-bold text-gray-900">{totalThisWeek.total}</span>
               </div>
               <div className="flex items-center justify-between mt-2">
                 <span className="text-sm text-gray-500">Dolu Pozisyon</span>
-                <span className="text-lg font-bold text-emerald-600">21<span className="text-sm font-normal text-gray-400"> / 24</span></span>
+                <span className="text-lg font-bold text-emerald-600">
+                  {totalThisWeek.filled}
+                  <span className="text-sm font-normal text-gray-400"> / {totalThisWeek.total}</span>
+                </span>
               </div>
             </div>
           </div>
