@@ -30,6 +30,8 @@ export type StaffWithDepartment = Staff & {
   departments: Department | null;
 };
 
+export type ShiftType = 'gunduz' | 'gece' | '24saat';
+
 export type Duty = {
   id: string;
   staff_id: string | null;
@@ -38,6 +40,7 @@ export type Duty = {
   start_time: string;
   end_time: string;
   status: 'active' | 'upcoming' | 'completed' | 'missed';
+  shift_type: ShiftType;
   notes: string | null;
 };
 

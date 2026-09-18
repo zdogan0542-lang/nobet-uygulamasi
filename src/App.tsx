@@ -3,6 +3,7 @@ import Sidebar from '@/components/Sidebar';
 import Topbar from '@/components/Topbar';
 import Dashboard from '@/components/Dashboard';
 import StaffManagement from '@/components/StaffManagement';
+import SchedulePage from '@/components/SchedulePage';
 
 export type PageId = 'dashboard' | 'staff' | 'schedule' | 'reports' | 'settings';
 
@@ -16,7 +17,8 @@ function App() {
         <Topbar />
         {page === 'dashboard' && <Dashboard />}
         {page === 'staff' && <StaffManagement />}
-        {(page === 'schedule' || page === 'reports' || page === 'settings') && (
+        {page === 'schedule' && <SchedulePage />}
+        {(page === 'reports' || page === 'settings') && (
           <div className="flex-1 flex items-center justify-center bg-gray-50">
             <div className="text-center">
               <p className="text-sm font-medium text-gray-400">Bu sayfa henüz hazır değil</p>
