@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, User, Building2, Clock, TriangleAlert, Trash2, CalendarDays } from 'lucide-react';
+import { X, User, Building2, Clock, TriangleAlert, Trash2, CalendarDays, CircleCheck } from 'lucide-react';
 import type { Department, DutyWithRelations, ShiftType, Staff } from '@/lib/supabase';
 import type { DutyInput } from '@/hooks/useScheduleData';
+import { validateDuty, type Conflict } from '@/lib/scheduleRules';
 
 export type DutyAssignModalProps = {
   open: boolean;
@@ -36,6 +37,12 @@ function formatDateLabel(dateStr: string): string {
   const d = new Date(dateStr);
   return `${d.getDate()} ${TR_MONTHS[d.getMonth()]} ${d.getFullYear()}, ${TR_DAYS[d.getDay()]}`;
 }
+
+const REASON_LABELS: Record<string, string> = {
+  consecutive: 'Ardışık Nöbet İhlali',
+  monthly_limit: 'Aylık Limit Aşıldı',
+  duplicate_same_day: 'Aynı Gün Çakışması',
+};
 
 export default function DutyAssignModal({
   open,
@@ -94,28 +101,19 @@ export default function DutyAssignModal({
 
   const isEditing = !!editingDuty;
 
-  // Check consecutive-day rule: same staff has duty on the previous or next day
-  const consecutiveWarning = useMemo(() => {
+  // Real-time validation using shared rule engine
+  const validation = useMemo(() => {
     if (!form.staff_id || !form.duty_date) return null;
-    const dutyDate = form.duty_date;
-    const prevDate = new Date(dutyDate);
-    prevDate.setDate(prevDate.getDate() - 1);
-    const prevStr = prevDate.toISOString().slice(0, 10);
-    const nextDate = new Date(dutyDate);
-    nextDate.setDate(nextDate.getDate() + 1);
-    const nextStr = nextDate.toISOString().slice(0, 10);
-
-    const hasAdjacent = duties.some(
-      (d) =>
-        d.staff_id === form.staff_id &&
-        d.id !== editingDuty?.id &&
-        (d.duty_date === prevStr || d.duty_date === nextStr)
+    return validateDuty(
+      { ...form, id: editingDuty?.id },
+      duties,
+      staff
     );
-    if (hasAdjacent) {
-      return 'Bu personelin bir önceki veya bir sonraki gününde nöbet bulunuyor. Ardışık nöbet kuralı ihlal edilebilir.';
-    }
-    return null;
-  }, [form.staff_id, form.duty_date, duties, editingDuty]);
+  }, [form, duties, staff, editingDuty]);
+
+  const conflicts: Conflict[] = validation?.conflicts ?? [];
+  const hasError = validation?.hasError ?? false;
+  const hasWarning = validation?.hasWarning ?? false;
 
   // Filter active staff, optionally by department
   const availableStaff = useMemo(() => {
@@ -140,7 +138,6 @@ export default function DutyAssignModal({
 
   const selectedStaff = staff.find((s) => s.id === form.staff_id);
   const maxDuties = selectedStaff?.max_duties_per_month ?? 10;
-  const exceedsMax = monthlyDutyCount >= maxDuties;
 
   if (!open) return null;
 
@@ -275,9 +272,6 @@ export default function DutyAssignModal({
             {form.staff_id && (
               <p className="mt-1.5 text-xs text-gray-400">
                 Bu ayki nöbet sayısı: {monthlyDutyCount} / {maxDuties}
-                {exceedsMax && (
-                  <span className="text-rose-500 font-medium"> — Aylık limit aşıldı!</span>
-                )}
               </p>
             )}
           </div>
@@ -336,28 +330,40 @@ export default function DutyAssignModal({
             </select>
           </div>
 
-          {/* Warnings */}
-          {consecutiveWarning && (
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200">
-              <TriangleAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-amber-800">Ardışık Nöbet Uyarısı</p>
-                <p className="text-sm text-amber-700 mt-0.5">{consecutiveWarning}</p>
-              </div>
+          {/* Real-time validation results */}
+          {form.staff_id && conflicts.length === 0 && !hasError && !hasWarning && (
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+              <CircleCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-emerald-700">Tüm kurallar uygun. Bu atama güvenle yapılabilir.</p>
             </div>
           )}
 
-          {exceedsMax && (
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200">
-              <TriangleAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          {conflicts.map((conflict, i) => (
+            <div
+              key={i}
+              className={`flex items-start gap-3 p-3.5 rounded-xl border ${
+                conflict.severity === 'error'
+                  ? 'bg-rose-50 border-rose-200'
+                  : 'bg-amber-50 border-amber-200'
+              }`}
+            >
+              <TriangleAlert className={`w-5 h-5 shrink-0 mt-0.5 ${
+                conflict.severity === 'error' ? 'text-rose-600' : 'text-amber-600'
+              }`} />
               <div>
-                <p className="text-sm font-medium text-rose-800">Aylık Limit Aşıldı</p>
-                <p className="text-sm text-rose-700 mt-0.5">
-                  Bu personelin aylık maksimum nöbet sayısı ({maxDuties}) dolmuştur.
+                <p className={`text-sm font-medium ${
+                  conflict.severity === 'error' ? 'text-rose-800' : 'text-amber-800'
+                }`}>
+                  {REASON_LABELS[conflict.reason] ?? 'Kural İhlali'}
+                </p>
+                <p className={`text-sm mt-0.5 ${
+                  conflict.severity === 'error' ? 'text-rose-700' : 'text-amber-700'
+                }`}>
+                  {conflict.message}
                 </p>
               </div>
             </div>
-          )}
+          ))}
 
           {submitError && (
             <div className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200">

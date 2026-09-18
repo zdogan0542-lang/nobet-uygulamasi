@@ -22,6 +22,7 @@ export type ScheduleData = {
   createDuty: (input: DutyInput) => Promise<{ error: string | null }>;
   updateDuty: (id: string, input: DutyInput) => Promise<{ error: string | null }>;
   deleteDuty: (id: string) => Promise<{ error: string | null }>;
+  bulkCreateDuties: (inputs: DutyInput[]) => Promise<{ error: string | null; count: number }>;
   refetch: () => Promise<void>;
 };
 
@@ -93,6 +94,14 @@ export function useScheduleData(): ScheduleData {
     return { error: null };
   }, [fetchAll]);
 
+  const bulkCreateDuties = useCallback(async (inputs: DutyInput[]): Promise<{ error: string | null; count: number }> => {
+    if (inputs.length === 0) return { error: null, count: 0 };
+    const { error: insertError } = await supabase.from('duties').insert(inputs);
+    if (insertError) return { error: insertError.message, count: 0 };
+    await fetchAll();
+    return { error: null, count: inputs.length };
+  }, [fetchAll]);
+
   return {
     staff,
     departments,
@@ -102,6 +111,7 @@ export function useScheduleData(): ScheduleData {
     createDuty,
     updateDuty,
     deleteDuty,
+    bulkCreateDuties,
     refetch: fetchAll,
   };
 }

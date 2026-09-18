@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  Calendar,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -13,16 +12,20 @@ import {
   Pencil,
   CalendarDays,
   LayoutGrid,
+  Sparkles,
+  Download,
+  Printer,
 } from 'lucide-react';
 import { useScheduleData } from '@/hooks/useScheduleData';
 import type { DutyInput } from '@/hooks/useScheduleData';
 import type { DutyWithRelations, ShiftType } from '@/lib/supabase';
 import DutyAssignModal from '@/components/DutyAssignModal';
+import AutoGenerateModal from '@/components/AutoGenerateModal';
 import Toast, { type ToastMessage, type ToastType } from '@/components/Toast';
+import { buildConflictMap, exportScheduleCSV, printSchedule, type Conflict } from '@/lib/scheduleRules';
 
 const TR_MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const TR_DAYS_SHORT = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
-const TR_DAYS_LONG = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 
 const SHIFT_LABELS: Record<ShiftType, string> = {
   gunduz: 'Gündüz',
@@ -43,16 +46,18 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string; dot: string }>
   missed: { label: 'Boş', cls: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500' },
 };
 
+const REASON_LABELS: Record<string, string> = {
+  consecutive: 'Ardışık nöbet ihlali (24s dinlenme)',
+  monthly_limit: 'Aylık nöbet limiti aşıldı',
+  duplicate_same_day: 'Aynı gün çakışması',
+};
+
 function getInitials(name: string): string {
   return name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 }
 
 function dateToStr(d: Date): string {
   return d.toISOString().slice(0, 10);
-}
-
-function isSameDay(d1: string, d2: string): boolean {
-  return d1 === d2;
 }
 
 type ViewMode = 'month' | 'week';
@@ -66,7 +71,7 @@ type ModalState = {
 };
 
 export default function SchedulePage() {
-  const { staff, departments, duties, loading, error, createDuty, updateDuty, deleteDuty } = useScheduleData();
+  const { staff, departments, duties, loading, error, createDuty, updateDuty, deleteDuty, bulkCreateDuties } = useScheduleData();
 
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(() => new Date());
@@ -79,6 +84,8 @@ export default function SchedulePage() {
     prefillShiftType: null,
     prefillDepartmentId: null,
   });
+  const [autoGenOpen, setAutoGenOpen] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
   function showToast(type: ToastType, message: string) {
@@ -90,24 +97,8 @@ export default function SchedulePage() {
     return Array.from(set).sort();
   }, [staff]);
 
-  // Build a lookup of staff_id -> duties for consecutive check
-  const consecutiveStaffIds = useMemo(() => {
-    const set = new Set<string>();
-    const sorted = [...duties].sort((a, b) => a.duty_date.localeCompare(b.duty_date));
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const cur = sorted[i];
-      const next = sorted[i + 1];
-      if (cur.staff_id && cur.staff_id === next.staff_id) {
-        const d1 = new Date(cur.duty_date);
-        const d2 = new Date(next.duty_date);
-        const diff = Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24);
-        if (diff === 1) {
-          set.add(cur.staff_id);
-        }
-      }
-    }
-    return set;
-  }, [duties]);
+  // Build conflict map for all duties
+  const conflictMap = useMemo(() => buildConflictMap(duties, staff), [duties, staff]);
 
   // Filter duties
   const filteredDuties = useMemo(() => {
@@ -141,16 +132,13 @@ export default function SchedulePage() {
     const daysInMonth = lastDay.getDate();
 
     const cells: { date: Date; inMonth: boolean }[] = [];
-    // Previous month padding
     for (let i = startWeekday - 1; i >= 0; i--) {
       const d = new Date(year, month, -i);
       cells.push({ date: d, inMonth: false });
     }
-    // Current month
     for (let i = 1; i <= daysInMonth; i++) {
       cells.push({ date: new Date(year, month, i), inMonth: true });
     }
-    // Next month padding to fill 6 rows
     const remaining = 42 - cells.length;
     for (let i = 1; i <= remaining; i++) {
       cells.push({ date: new Date(year, month + 1, i), inMonth: false });
@@ -246,6 +234,35 @@ export default function SchedulePage() {
     return result;
   }
 
+  async function handleAutoGenerate(duties: DutyInput[]): Promise<{ error: string | null; count: number }> {
+    const result = await bulkCreateDuties(duties);
+    if (result.error) {
+      showToast('error', 'Otomatik oluşturma başarısız: ' + result.error);
+    } else {
+      showToast('success', `${result.count} nöbet otomatik atandı`);
+    }
+    return result;
+  }
+
+  function handleExportCSV() {
+    setExportMenuOpen(false);
+    const monthDuties = filteredDuties.filter((d) => {
+      const monthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+      return d.duty_date.slice(0, 7) === monthStr;
+    });
+    if (monthDuties.length === 0) {
+      showToast('error', 'Bu ay için dışa aktarılacak nöbet bulunmuyor');
+      return;
+    }
+    exportScheduleCSV(monthDuties, TR_MONTHS[currentDate.getMonth()], currentDate.getFullYear());
+    showToast('success', 'CSV dosyası indirildi');
+  }
+
+  function handlePrint() {
+    setExportMenuOpen(false);
+    printSchedule();
+  }
+
   // Stats
   const stats = useMemo(() => {
     const active = filteredDuties.filter((d) => d.status === 'active').length;
@@ -282,6 +299,28 @@ export default function SchedulePage() {
     ? `${TR_MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`
     : `${weekDays[0].getDate()} ${TR_MONTHS[weekDays[0].getMonth()]} — ${weekDays[6].getDate()} ${TR_MONTHS[weekDays[6].getMonth()]} ${weekDays[6].getFullYear()}`;
 
+  // Render conflict tooltip content for a duty
+  function renderConflictTooltip(dutyId: string): React.ReactNode {
+    const conflicts = conflictMap.get(dutyId);
+    if (!conflicts || conflicts.length === 0) return null;
+    return (
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 hidden group-hover:block animate-fade-in">
+        <div className="bg-gray-900 text-white text-xs rounded-lg shadow-xl px-3 py-2 max-w-[220px]">
+          {conflicts.map((c: Conflict, i: number) => (
+            <div key={i} className={i > 0 ? 'mt-1.5 pt-1.5 border-t border-gray-700' : ''}>
+              <p className="font-semibold flex items-center gap-1">
+                <TriangleAlert className={`w-3 h-3 ${c.severity === 'error' ? 'text-rose-400' : 'text-amber-400'}`} />
+                {REASON_LABELS[c.reason] ?? 'Kural İhlali'}
+              </p>
+              <p className="text-gray-300 mt-0.5">{c.message}</p>
+            </div>
+          ))}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45 -mt-1" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50 bg-grid-pattern">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
@@ -293,13 +332,52 @@ export default function SchedulePage() {
               Toplam {stats.total} nöbet · {stats.active} aktif · {stats.upcoming} bekleyen · {stats.missed} boş
             </p>
           </div>
-          <button
-            onClick={() => setModal({ open: true, editingDuty: null, prefillDate: todayStr, prefillShiftType: 'gunduz', prefillDepartmentId: deptFilter || null })}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 transition-all hover:shadow-lg hover:shadow-brand-600/20 hover:-translate-y-0.5"
-          >
-            <Plus className="w-4 h-4" />
-            Nöbet Ata
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setAutoGenOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-brand-600 to-brand-700 text-white text-sm font-semibold hover:from-brand-700 hover:to-brand-800 transition-all hover:shadow-lg hover:shadow-brand-600/20 hover:-translate-y-0.5"
+            >
+              <Sparkles className="w-4 h-4" />
+              Otomatik Oluştur
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setExportMenuOpen(!exportMenuOpen)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-all"
+              >
+                <Download className="w-4 h-4" />
+                Dışa Aktar
+              </button>
+              {exportMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setExportMenuOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-1 z-30 animate-fade-in-up">
+                    <button
+                      onClick={handleExportCSV}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <Download className="w-4 h-4 text-gray-400" />
+                      CSV / Excel
+                    </button>
+                    <button
+                      onClick={handlePrint}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <Printer className="w-4 h-4 text-gray-400" />
+                      PDF / Yazdır
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => setModal({ open: true, editingDuty: null, prefillDate: todayStr, prefillShiftType: 'gunduz', prefillDepartmentId: deptFilter || null })}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 transition-all hover:shadow-lg hover:shadow-brand-600/20 hover:-translate-y-0.5"
+            >
+              <Plus className="w-4 h-4" />
+              Nöbet Ata
+            </button>
+          </div>
         </div>
 
         {/* Toolbar */}
@@ -382,7 +460,7 @@ export default function SchedulePage() {
             ))}
             <div className="flex items-center gap-1.5">
               <TriangleAlert className="w-3.5 h-3.5 text-amber-500" />
-              <span className="text-xs font-medium text-gray-600">Ardışık nöbet ihlali</span>
+              <span className="text-xs font-medium text-gray-600">Kural ihlali (üzerine gelin)</span>
             </div>
           </div>
         </div>
@@ -390,7 +468,6 @@ export default function SchedulePage() {
         {/* Month View */}
         {viewMode === 'month' && (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden animate-fade-in-up">
-            {/* Day headers */}
             <div className="grid grid-cols-7 border-b border-gray-100">
               {TR_DAYS_SHORT.map((day, i) => (
                 <div key={day} className={`px-2 py-2.5 text-center text-xs font-semibold uppercase tracking-wider ${i === 0 || i === 6 ? 'text-rose-400' : 'text-gray-500'}`}>
@@ -398,13 +475,11 @@ export default function SchedulePage() {
                 </div>
               ))}
             </div>
-            {/* Calendar cells */}
             <div className="grid grid-cols-7">
               {monthGrid.map((cell, i) => {
                 const dateStr = dateToStr(cell.date);
                 const dayDuties = dutiesByDate.get(dateStr) ?? [];
                 const isToday = dateStr === todayStr;
-                const hasConsecutive = dayDuties.some((d) => d.staff_id && consecutiveStaffIds.has(d.staff_id));
 
                 return (
                   <div
@@ -430,19 +505,22 @@ export default function SchedulePage() {
                       {dayDuties.slice(0, 4).map((duty) => {
                         const statusCfg = STATUS_CONFIG[duty.status] ?? STATUS_CONFIG.upcoming;
                         const ShiftIcon = SHIFT_ICONS[duty.shift_type];
-                        const hasWarn = duty.staff_id && consecutiveStaffIds.has(duty.staff_id);
+                        const conflicts = conflictMap.get(duty.id);
+                        const hasConflict = conflicts && conflicts.length > 0;
                         return (
-                          <button
-                            key={duty.id}
-                            onClick={() => handleDutyClick(duty)}
-                            className={`w-full flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] font-medium border ${statusCfg.cls} hover:shadow-sm transition-all text-left`}
-                          >
-                            <ShiftIcon className="w-2.5 h-2.5 shrink-0" />
-                            <span className="truncate flex-1">
-                              {duty.staff ? getInitials(duty.staff.full_name) : 'Boş'}
-                            </span>
-                            {hasWarn && <TriangleAlert className="w-2.5 h-2.5 text-amber-500 shrink-0" />}
-                          </button>
+                          <div key={duty.id} className="group relative">
+                            {renderConflictTooltip(duty.id)}
+                            <button
+                              onClick={() => handleDutyClick(duty)}
+                              className={`w-full flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] font-medium border ${statusCfg.cls} hover:shadow-sm transition-all text-left`}
+                            >
+                              <ShiftIcon className="w-2.5 h-2.5 shrink-0" />
+                              <span className="truncate flex-1">
+                                {duty.staff ? getInitials(duty.staff.full_name) : 'Boş'}
+                              </span>
+                              {hasConflict && <TriangleAlert className="w-2.5 h-2.5 text-amber-500 shrink-0" />}
+                            </button>
+                          </div>
                         );
                       })}
                       {dayDuties.length > 4 && (
@@ -520,40 +598,43 @@ export default function SchedulePage() {
                           ) : (
                             shiftDuties.map((duty) => {
                               const statusCfg = STATUS_CONFIG[duty.status] ?? STATUS_CONFIG.upcoming;
-                              const hasWarn = duty.staff_id && consecutiveStaffIds.has(duty.staff_id);
+                              const conflicts = conflictMap.get(duty.id);
+                              const hasConflict = conflicts && conflicts.length > 0;
                               return (
-                                <button
-                                  key={duty.id}
-                                  onClick={() => handleDutyClick(duty)}
-                                  className={`w-full text-left p-2 rounded-lg border ${statusCfg.cls} hover:shadow-md transition-all`}
-                                >
-                                  <div className="flex items-center justify-between mb-1">
-                                    <div className="flex items-center gap-1">
-                                      <ShiftIcon className="w-3 h-3" />
-                                      <span className="text-[10px] font-semibold">{SHIFT_LABELS[duty.shift_type]}</span>
-                                    </div>
-                                    {hasWarn && <TriangleAlert className="w-3 h-3 text-amber-500" />}
-                                  </div>
-                                  {duty.staff ? (
-                                    <div className="flex items-center gap-1.5">
-                                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-gray-600 text-[8px] font-bold shrink-0">
-                                        {getInitials(duty.staff.full_name)}
+                                <div key={duty.id} className="group relative">
+                                  {renderConflictTooltip(duty.id)}
+                                  <button
+                                    onClick={() => handleDutyClick(duty)}
+                                    className={`w-full text-left p-2 rounded-lg border ${statusCfg.cls} hover:shadow-md transition-all`}
+                                  >
+                                    <div className="flex items-center justify-between mb-1">
+                                      <div className="flex items-center gap-1">
+                                        <ShiftIcon className="w-3 h-3" />
+                                        <span className="text-[10px] font-semibold">{SHIFT_LABELS[duty.shift_type]}</span>
                                       </div>
-                                      <div className="min-w-0">
-                                        <p className="text-[11px] font-semibold text-gray-900 truncate">{duty.staff.full_name}</p>
-                                        <p className="text-[9px] text-gray-400 truncate">{duty.staff.title}</p>
+                                      {hasConflict && <TriangleAlert className="w-3 h-3 text-amber-500" />}
+                                    </div>
+                                    {duty.staff ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-gray-600 text-[8px] font-bold shrink-0">
+                                          {getInitials(duty.staff.full_name)}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <p className="text-[11px] font-semibold text-gray-900 truncate">{duty.staff.full_name}</p>
+                                          <p className="text-[9px] text-gray-400 truncate">{duty.staff.title}</p>
+                                        </div>
                                       </div>
-                                    </div>
-                                  ) : (
-                                    <p className="text-[11px] font-medium text-rose-600">Atama Bekliyor</p>
-                                  )}
-                                  {duty.departments && (
-                                    <div className="flex items-center gap-1 mt-1">
-                                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: duty.departments.color }} />
-                                      <span className="text-[9px] text-gray-500 truncate">{duty.departments.name}</span>
-                                    </div>
-                                  )}
-                                </button>
+                                    ) : (
+                                      <p className="text-[11px] font-medium text-rose-600">Atama Bekliyor</p>
+                                    )}
+                                    {duty.departments && (
+                                      <div className="flex items-center gap-1 mt-1">
+                                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: duty.departments.color }} />
+                                        <span className="text-[9px] text-gray-500 truncate">{duty.departments.name}</span>
+                                      </div>
+                                    )}
+                                  </button>
+                                </div>
                               );
                             })
                           )}
@@ -570,7 +651,7 @@ export default function SchedulePage() {
         {/* Quick add hint */}
         <div className="flex items-center gap-2 text-sm text-gray-400">
           <Pencil className="w-3.5 h-3.5" />
-          <span>Boş bir slota tıklayarak nöbet atayın, dolu bir slota tıklayarak düzenleyin veya silin.</span>
+          <span>Boş bir slota tıklayarak nöbet atayın, dolu bir slota tıklayarak düzenleyin veya silin. Kural ihlali simgesinin üzerine gelerek detayları görün.</span>
         </div>
       </div>
 
@@ -586,6 +667,17 @@ export default function SchedulePage() {
         staff={staff}
         departments={departments}
         duties={duties}
+      />
+
+      <AutoGenerateModal
+        open={autoGenOpen}
+        onClose={() => setAutoGenOpen(false)}
+        onGenerate={handleAutoGenerate}
+        staff={staff}
+        departments={departments}
+        duties={duties}
+        year={currentDate.getFullYear()}
+        month={currentDate.getMonth()}
       />
 
       <Toast toast={toast} onClose={() => setToast(null)} />
