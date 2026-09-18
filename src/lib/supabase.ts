@@ -21,7 +21,13 @@ export type Staff = {
   title: string;
   department_id: string | null;
   phone: string | null;
+  email: string | null;
+  max_duties_per_month: number;
   active: boolean;
+};
+
+export type StaffWithDepartment = Staff & {
+  departments: Department | null;
 };
 
 export type Duty = {

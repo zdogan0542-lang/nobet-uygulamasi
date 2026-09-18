@@ -11,15 +11,21 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import type { PageId } from '@/App';
 
 type NavItem = {
+  id: PageId;
   label: string;
   icon: typeof LayoutDashboard;
-  active?: boolean;
   badge?: string;
 };
 
-export default function Sidebar() {
+type SidebarProps = {
+  activePage: PageId;
+  onNavigate: (page: PageId) => void;
+};
+
+export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -37,11 +43,11 @@ export default function Sidebar() {
   }, []);
 
   const navItems: NavItem[] = [
-    { label: 'Genel Bakış', icon: LayoutDashboard, active: true },
-    { label: 'Nöbet Çizelgesi', icon: Calendar, badge: pendingCount > 0 ? String(pendingCount) : undefined },
-    { label: 'Personel', icon: Users },
-    { label: 'Raporlar', icon: FileBarChart },
-    { label: 'Ayarlar', icon: Settings },
+    { id: 'dashboard', label: 'Genel Bakış', icon: LayoutDashboard },
+    { id: 'schedule', label: 'Nöbet Çizelgesi', icon: Calendar, badge: pendingCount > 0 ? String(pendingCount) : undefined },
+    { id: 'staff', label: 'Personel', icon: Users },
+    { id: 'reports', label: 'Raporlar', icon: FileBarChart },
+    { id: 'settings', label: 'Ayarlar', icon: Settings },
   ];
 
   return (
@@ -65,11 +71,13 @@ export default function Sidebar() {
       <nav className="flex-1 px-3 py-6 space-y-1">
         {navItems.map((item, i) => {
           const Icon = item.icon;
+          const isActive = activePage === item.id;
           return (
             <button
-              key={item.label}
+              key={item.id}
+              onClick={() => onNavigate(item.id)}
               className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 animate-slide-in ${
-                item.active
+                isActive
                   ? 'bg-brand-50 text-brand-700'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }`}
@@ -77,7 +85,7 @@ export default function Sidebar() {
             >
               <Icon
                 className={`w-5 h-5 shrink-0 transition-transform group-hover:scale-110 ${
-                  item.active ? 'text-brand-600' : 'text-gray-400 group-hover:text-gray-600'
+                  isActive ? 'text-brand-600' : 'text-gray-400 group-hover:text-gray-600'
                 }`}
               />
               {!collapsed && (
@@ -88,7 +96,7 @@ export default function Sidebar() {
                   {item.badge}
                 </span>
               )}
-              {item.active && !collapsed && (
+              {isActive && !collapsed && (
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-600 animate-pulse-ring" />
               )}
             </button>
