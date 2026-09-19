@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Calendar, Users, ChartBar as FileBarChart, Settings, ShieldPlus, LogOut, ChevronLeft, ChevronRight, UsersRound } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, ChartBar as FileBarChart, Settings, ShieldPlus, LogOut, ChevronLeft, ChevronRight, UsersRound, ArrowLeftRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { PageId } from '@/App';
 
@@ -18,6 +18,7 @@ type SidebarProps = {
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingSwapCount, setPendingSwapCount] = useState(0);
 
   useEffect(() => {
     async function fetchPending() {
@@ -28,6 +29,14 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
       if (!error && count !== null) {
         setPendingCount(count);
       }
+
+      const { count: swapCount, error: swapError } = await supabase
+        .from('swap_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      if (!swapError && swapCount !== null) {
+        setPendingSwapCount(swapCount);
+      }
     }
     fetchPending();
   }, []);
@@ -37,6 +46,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
     { id: 'schedule', label: 'Nöbet Çizelgesi', icon: Calendar, badge: pendingCount > 0 ? String(pendingCount) : undefined },
     { id: 'staff', label: 'Personel', icon: Users },
     { id: 'groups', label: 'Nöbet Grupları', icon: UsersRound },
+    { id: 'swaps', label: 'Değişim Talepleri', icon: ArrowLeftRight, badge: pendingSwapCount > 0 ? String(pendingSwapCount) : undefined },
     { id: 'reports', label: 'Raporlar', icon: FileBarChart },
     { id: 'settings', label: 'Ayarlar', icon: Settings },
   ];

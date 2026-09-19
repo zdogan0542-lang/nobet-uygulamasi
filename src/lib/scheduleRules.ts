@@ -413,3 +413,89 @@ export function exportScheduleCSV(
 export function printSchedule(): void {
   window.print();
 }
+
+// Swap validation
+export type SwapValidation = {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+};
+
+export function validateSwap(
+  duty: DutyWithRelations,
+  toStaffId: string,
+  allDuties: DutyWithRelations[],
+  staff: Staff[],
+  dutyGroups: DutyGroup[]
+): SwapValidation {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  const targetStaff = staff.find((s) => s.id === toStaffId);
+  if (!targetStaff) {
+    errors.push('Hedef personel bulunamadı.');
+    return { valid: false, errors, warnings };
+  }
+
+  if (!targetStaff.active) {
+    errors.push('Hedef personel aktif değil.');
+  }
+
+  if (duty.staff_id === toStaffId) {
+    errors.push('Nöbet zaten bu personelde. Farklı bir personel seçiniz.');
+  }
+
+  // Determine effective group rules
+  const groupRules = duty.duty_group_id
+    ? dutyGroups.find((g) => g.id === duty.duty_group_id)
+    : null;
+  const minRestHours = groupRules?.min_rest_hours ?? 24;
+  const monthlyLimit = groupRules?.max_duties_per_month ?? targetStaff.max_duties_per_month;
+
+  // Check for overlapping shifts on the same day
+  const candidateSpan = getDutySpan(duty.duty_date, duty.start_time, duty.end_time, duty.shift_type);
+  const targetDuties = allDuties.filter(
+    (d) => d.staff_id === toStaffId && d.id !== duty.id
+  );
+
+  for (const d of targetDuties) {
+    const span = getDutySpan(d.duty_date, d.start_time, d.end_time, d.shift_type);
+    // Overlap check
+    if (candidateSpan.start < span.end && span.start < candidateSpan.end) {
+      const sameDay = d.duty_date === duty.duty_date;
+      if (sameDay) {
+        errors.push(`Aynı gün çakışan nöbet var: ${d.duty_date} ${d.start_time}-${d.end_time}.`);
+      } else {
+        errors.push(`Zaman çakışması: ${d.duty_date} tarihindeki nöbet ile örtüşüyor.`);
+      }
+    }
+  }
+
+  // Check rest-hours rule
+  const targetSpans = targetDuties.map((d) =>
+    getDutySpan(d.duty_date, d.start_time, d.end_time, d.shift_type)
+  );
+  if (hasRestViolation(candidateSpan, targetSpans, minRestHours)) {
+    errors.push(`Dinlenme süresi kuralı ihlal ediliyor. Minimum ${minRestHours} saat dinlenme gerekir.`);
+  }
+
+  // Check monthly limit
+  const month = duty.duty_date.slice(0, 7);
+  const monthCount = targetDuties.filter(
+    (d) => d.duty_date.slice(0, 7) === month
+  ).length;
+  if (monthCount >= monthlyLimit) {
+    errors.push(`Hedef personelin aylık nöbet limiti dolu (${monthCount}/${monthlyLimit}).`);
+  }
+
+  // Warning if different duty group
+  if (targetStaff.duty_group_id && duty.duty_group_id && targetStaff.duty_group_id !== duty.duty_group_id) {
+    warnings.push('Hedef personel farklı bir nöbet grubuna ait.');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}

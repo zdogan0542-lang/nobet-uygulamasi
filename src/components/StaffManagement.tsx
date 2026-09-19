@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useStaffData } from '@/hooks/useStaffData';
 import type { StaffInput } from '@/hooks/useStaffData';
-import type { Staff, StaffWithDepartment } from '@/lib/supabase';
+import type { Staff, StaffWithGroup } from '@/lib/supabase';
 import StaffFormModal from '@/components/StaffFormModal';
 import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 import Toast, { type ToastMessage, type ToastType } from '@/components/Toast';
@@ -100,7 +100,7 @@ export default function StaffManagement() {
     }
   }
 
-  async function handleDeleteClick(staffMember: StaffWithDepartment) {
+  async function handleDeleteClick(staffMember: StaffWithGroup) {
     setDeleteTarget(staffMember);
     setLoadingCount(true);
     const count = await getUpcomingDutyCount(staffMember.id);

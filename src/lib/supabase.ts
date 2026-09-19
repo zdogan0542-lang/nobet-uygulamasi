@@ -50,3 +50,23 @@ export type DutyWithRelations = Duty & {
   staff: Staff | null;
   duty_groups: DutyGroup | null;
 };
+
+export type SwapStatus = 'pending' | 'approved' | 'rejected';
+
+export type SwapRequest = {
+  id: string;
+  duty_id: string;
+  from_staff_id: string;
+  to_staff_id: string;
+  status: SwapStatus;
+  reason: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+};
+
+export type SwapRequestWithRelations = SwapRequest & {
+  duty: DutyWithRelations | null;
+  from_staff: Staff | null;
+  to_staff: Staff | null;
+};
