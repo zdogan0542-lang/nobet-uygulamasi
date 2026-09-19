@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { DutyGroup, StaffWithDepartment } from '@/lib/supabase';
+import type { DutyGroup, StaffWithGroup } from '@/lib/supabase';
 
 export type StaffInput = {
   full_name: string;
@@ -13,7 +13,7 @@ export type StaffInput = {
 };
 
 export function useStaffData() {
-  const [staff, setStaff] = useState<StaffWithDepartment[]>([]);
+  const [staff, setStaff] = useState<StaffWithGroup[]>([]);
   const [dutyGroups, setDutyGroups] = useState<DutyGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +35,7 @@ export function useStaffData() {
       if (staffError) throw staffError;
 
       setDutyGroups(groupData ?? []);
-      setStaff((staffData ?? []) as StaffWithDepartment[]);
+      setStaff((staffData ?? []) as StaffWithGroup[]);
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);

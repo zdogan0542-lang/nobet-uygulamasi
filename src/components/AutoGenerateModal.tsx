@@ -59,6 +59,7 @@ export default function AutoGenerateModal({
     const res = generateAutoSchedule(
       { year, month, dutyGroupId: dutyGroupId || null, shiftTypes },
       staff,
+      dutyGroups,
       duties
     );
     setResult(res);

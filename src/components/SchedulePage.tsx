@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useScheduleData } from '@/hooks/useScheduleData';
 import type { DutyInput } from '@/hooks/useScheduleData';
-import type { DutyWithRelations, ShiftType } from '@/lib/supabase';
+import type { DutyGroup, DutyWithRelations, ShiftType } from '@/lib/supabase';
 import DutyAssignModal from '@/components/DutyAssignModal';
 import AutoGenerateModal from '@/components/AutoGenerateModal';
 import Toast, { type ToastMessage, type ToastType } from '@/components/Toast';
@@ -67,22 +67,22 @@ type ModalState = {
   editingDuty: DutyWithRelations | null;
   prefillDate: string | null;
   prefillShiftType: ShiftType | null;
-  prefillDepartmentId: string | null;
+  prefillDutyGroupId: string | null;
 };
 
 export default function SchedulePage() {
-  const { staff, departments, duties, loading, error, createDuty, updateDuty, deleteDuty, bulkCreateDuties } = useScheduleData();
+  const { staff, dutyGroups, duties, loading, error, createDuty, updateDuty, deleteDuty, bulkCreateDuties } = useScheduleData();
 
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(() => new Date());
-  const [deptFilter, setDeptFilter] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [modal, setModal] = useState<ModalState>({
     open: false,
     editingDuty: null,
     prefillDate: null,
     prefillShiftType: null,
-    prefillDepartmentId: null,
+    prefillDutyGroupId: null,
   });
   const [autoGenOpen, setAutoGenOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -103,14 +103,14 @@ export default function SchedulePage() {
   // Filter duties
   const filteredDuties = useMemo(() => {
     return duties.filter((d) => {
-      if (deptFilter && d.department_id !== deptFilter) return false;
+      if (groupFilter && d.duty_group_id !== groupFilter) return false;
       if (roleFilter) {
         const dutyStaff = staff.find((s) => s.id === d.staff_id);
         if (!dutyStaff || dutyStaff.title !== roleFilter) return false;
       }
       return true;
     });
-  }, [duties, deptFilter, roleFilter, staff]);
+  }, [duties, groupFilter, roleFilter, staff]);
 
   // Group duties by date
   const dutiesByDate = useMemo(() => {
@@ -184,13 +184,13 @@ export default function SchedulePage() {
     setCurrentDate(new Date());
   }
 
-  function handleSlotClick(date: string, shiftType: ShiftType, departmentId: string | null) {
+  function handleSlotClick(date: string, shiftType: ShiftType, dutyGroupId: string | null) {
     setModal({
       open: true,
       editingDuty: null,
       prefillDate: date,
       prefillShiftType: shiftType,
-      prefillDepartmentId: departmentId,
+      prefillDutyGroupId: dutyGroupId,
     });
   }
 
@@ -200,7 +200,7 @@ export default function SchedulePage() {
       editingDuty: duty,
       prefillDate: null,
       prefillShiftType: null,
-      prefillDepartmentId: null,
+      prefillDutyGroupId: null,
     });
   }
 
@@ -371,7 +371,7 @@ export default function SchedulePage() {
               )}
             </div>
             <button
-              onClick={() => setModal({ open: true, editingDuty: null, prefillDate: todayStr, prefillShiftType: 'gunduz', prefillDepartmentId: deptFilter || null })}
+              onClick={() => setModal({ open: true, editingDuty: null, prefillDate: todayStr, prefillShiftType: 'gunduz', prefillDutyGroupId: groupFilter || null })}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 transition-all hover:shadow-lg hover:shadow-brand-600/20 hover:-translate-y-0.5"
             >
               <Plus className="w-4 h-4" />
@@ -424,13 +424,13 @@ export default function SchedulePage() {
               <div className="relative flex-1 lg:flex-none">
                 <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <select
-                  value={deptFilter}
-                  onChange={(e) => setDeptFilter(e.target.value)}
+                  value={groupFilter}
+                  onChange={(e) => setGroupFilter(e.target.value)}
                   className="pl-10 pr-8 py-2.5 text-sm rounded-lg bg-gray-50 border border-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all appearance-none cursor-pointer min-w-[150px]"
                 >
-                  <option value="">Tüm Bölümler</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                  <option value="">Tüm Gruplar</option>
+                  {dutyGroups.map((g: DutyGroup) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
                   ))}
                 </select>
               </div>
@@ -528,7 +528,7 @@ export default function SchedulePage() {
                       )}
                       {dayDuties.length === 0 && cell.inMonth && (
                         <button
-                          onClick={() => handleSlotClick(dateStr, 'gunduz', deptFilter || null)}
+                          onClick={() => handleSlotClick(dateStr, 'gunduz', groupFilter || null)}
                           className="w-full flex items-center justify-center gap-1 px-1.5 py-1 rounded-md text-[10px] text-gray-300 hover:text-brand-500 hover:bg-brand-50 transition-colors border border-dashed border-gray-200 hover:border-brand-300"
                         >
                           <Plus className="w-2.5 h-2.5" />
@@ -563,7 +563,7 @@ export default function SchedulePage() {
                         </p>
                       </div>
                       <button
-                        onClick={() => handleSlotClick(dateStr, 'gunduz', deptFilter || null)}
+                        onClick={() => handleSlotClick(dateStr, 'gunduz', groupFilter || null)}
                         className="p-1.5 rounded-lg text-gray-300 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                       >
                         <Plus className="w-4 h-4" />
@@ -588,7 +588,7 @@ export default function SchedulePage() {
                         <div key={dayIdx} className="min-h-[100px] p-2 border-r border-gray-50 space-y-1.5">
                           {shiftDuties.length === 0 ? (
                             <button
-                              onClick={() => handleSlotClick(dateStr, shiftType, deptFilter || null)}
+                              onClick={() => handleSlotClick(dateStr, shiftType, groupFilter || null)}
                               className="w-full h-full min-h-[80px] flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-gray-200 text-gray-300 hover:text-brand-500 hover:border-brand-300 hover:bg-brand-50/30 transition-all"
                             >
                               <ShiftIcon className="w-4 h-4" />
@@ -627,10 +627,10 @@ export default function SchedulePage() {
                                     ) : (
                                       <p className="text-[11px] font-medium text-rose-600">Atama Bekliyor</p>
                                     )}
-                                    {duty.departments && (
+                                    {duty.duty_groups && (
                                       <div className="flex items-center gap-1 mt-1">
-                                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: duty.departments.color }} />
-                                        <span className="text-[9px] text-gray-500 truncate">{duty.departments.name}</span>
+                                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: duty.duty_groups.color }} />
+                                        <span className="text-[9px] text-gray-500 truncate">{duty.duty_groups.name}</span>
                                       </div>
                                     )}
                                   </button>
@@ -657,15 +657,15 @@ export default function SchedulePage() {
 
       <DutyAssignModal
         open={modal.open}
-        onClose={() => setModal({ open: false, editingDuty: null, prefillDate: null, prefillShiftType: null, prefillDepartmentId: null })}
+        onClose={() => setModal({ open: false, editingDuty: null, prefillDate: null, prefillShiftType: null, prefillDutyGroupId: null })}
         onSubmit={handleSubmit}
         onDelete={handleDelete}
         editingDuty={modal.editingDuty}
         prefillDate={modal.prefillDate}
         prefillShiftType={modal.prefillShiftType}
-        prefillDepartmentId={modal.prefillDepartmentId}
+        prefillDutyGroupId={modal.prefillDutyGroupId}
         staff={staff}
-        departments={departments}
+        dutyGroups={dutyGroups}
         duties={duties}
       />
 
@@ -674,7 +674,7 @@ export default function SchedulePage() {
         onClose={() => setAutoGenOpen(false)}
         onGenerate={handleAutoGenerate}
         staff={staff}
-        departments={departments}
+        dutyGroups={dutyGroups}
         duties={duties}
         year={currentDate.getFullYear()}
         month={currentDate.getMonth()}

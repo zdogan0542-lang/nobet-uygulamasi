@@ -1,4 +1,4 @@
-import type { DutyWithRelations, Staff } from '@/lib/supabase';
+import type { DutyGroup, DutyWithRelations, Staff } from '@/lib/supabase';
 
 export type ConflictReason = 'consecutive' | 'monthly_limit' | 'duplicate_same_day';
 
@@ -31,12 +31,12 @@ export function getConflictsForDuty(
     staff_id: string | null;
     duty_date: string;
     id?: string;
-  shift_type?: string;
-  department_id?: string | null;
-  start_time?: string;
+    shift_type?: string;
+    duty_group_id?: string | null;
+    start_time?: string;
     end_time?: string;
-  status?: string;
-  notes?: string | null;
+    status?: string;
+    notes?: string | null;
   },
   allDuties: DutyWithRelations[],
   staff: Staff[]
@@ -110,7 +110,7 @@ export function validateDuty(
     duty_date: string;
     id?: string;
     shift_type?: string;
-    department_id?: string | null;
+    duty_group_id?: string | null;
     start_time?: string;
     end_time?: string;
     status?: string;
@@ -146,7 +146,7 @@ export function buildConflictMap(
 export type AutoGenerateOptions = {
   year: number;
   month: number; // 0-indexed
-  departmentId: string | null;
+  dutyGroupId: string | null;
   shiftTypes: ShiftTypeOption[];
 };
 
@@ -157,7 +157,7 @@ export type ShiftTypeOption = {
 
 export type GeneratedDuty = {
   staff_id: string;
-  department_id: string;
+  duty_group_id: string;
   duty_date: string;
   start_time: string;
   end_time: string;
@@ -185,20 +185,24 @@ export type AutoGenerateResult = {
 export function generateAutoSchedule(
   options: AutoGenerateOptions,
   staff: Staff[],
+  dutyGroups: DutyGroup[],
   existingDuties: DutyWithRelations[]
 ): AutoGenerateResult {
-  const { year, month, departmentId, shiftTypes } = options;
+  const { year, month, dutyGroupId, shiftTypes } = options;
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
 
-  // Get active staff for this department
+  // Get active staff for this duty group
   let eligibleStaff = staff.filter((s) => s.active);
-  if (departmentId) {
+  if (dutyGroupId) {
     eligibleStaff = eligibleStaff.filter(
-      (s) => s.department_id === departmentId || s.department_id === null
+      (s) => s.duty_group_id === dutyGroupId || s.duty_group_id === null
     );
   }
+
+  // Resolve the duty group for group-specific rules
+  const groupRules = dutyGroupId ? dutyGroups.find((g) => g.id === dutyGroupId) : null;
 
   const enabledShifts = shiftTypes.filter((s) => s.enabled).map((s) => s.type);
 
@@ -207,9 +211,11 @@ export function generateAutoSchedule(
   // Track monthly counts: staffId -> count
   const staffMonthlyCount = new Map<string, number>();
 
-  // Pre-populate from existing duties
+  // Pre-populate from existing duties (same month, same group if specified)
   for (const d of existingDuties) {
     if (d.duty_date.slice(0, 7) === monthStr && d.staff_id) {
+      // If filtering by group, only count duties in that group
+      if (dutyGroupId && d.duty_group_id !== dutyGroupId) continue;
       staffDutyDates.set(d.staff_id, (staffDutyDates.get(d.staff_id) ?? new Set()).add(d.duty_date));
       staffMonthlyCount.set(d.staff_id, (staffMonthlyCount.get(d.staff_id) ?? 0) + 1);
     }
@@ -226,12 +232,12 @@ export function generateAutoSchedule(
     const dateStr = `${monthStr}-${String(day).padStart(2, '0')}`;
 
     for (const shiftType of enabledShifts) {
-      // Check if there's already a duty for this date+shift+department
+      // Check if there's already a duty for this date+shift+group
       const existing = existingDuties.find(
         (d) =>
           d.duty_date === dateStr &&
           d.shift_type === shiftType &&
-          (!departmentId || d.department_id === departmentId)
+          (!dutyGroupId || d.duty_group_id === dutyGroupId)
       );
       if (existing) continue;
 
@@ -244,11 +250,14 @@ export function generateAutoSchedule(
         shiftIdx[shiftType]++;
         const candidate = eligibleStaff[idx];
 
+        // Determine the effective monthly limit: group rule overrides staff rule
+        const monthlyLimit = groupRules?.max_duties_per_month ?? candidate.max_duties_per_month;
+
         // Check monthly limit
         const currentCount = staffMonthlyCount.get(candidate.id) ?? 0;
-        if (currentCount >= candidate.max_duties_per_month) continue;
+        if (currentCount >= monthlyLimit) continue;
 
-        // Check consecutive day rule
+        // Check consecutive day rule (24h rest)
         const prevDate = addDays(dateStr, -1);
         const nextDate = addDays(dateStr, 1);
         const dutyDates = staffDutyDates.get(candidate.id) ?? new Set<string>();
@@ -261,7 +270,7 @@ export function generateAutoSchedule(
         const times = SHIFT_TIMES[shiftType];
         generated.push({
           staff_id: candidate.id,
-          department_id: departmentId ?? candidate.department_id ?? '',
+          duty_group_id: dutyGroupId ?? candidate.duty_group_id ?? '',
           duty_date: dateStr,
           start_time: times.start,
           end_time: times.end,
@@ -305,7 +314,7 @@ export function exportScheduleCSV(
   monthName: string,
   year: number
 ): void {
-  const headers = ['Tarih', 'Gün', 'Nöbet Türü', 'Personel', 'Ünvan', 'Bölüm', 'Başlangıç', 'Bitiş', 'Durum'];
+  const headers = ['Tarih', 'Gün', 'Nöbet Türü', 'Personel', 'Ünvan', 'Nöbet Grubu', 'Başlangıç', 'Bitiş', 'Durum'];
 
   const TR_DAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
   const STATUS_LABELS: Record<string, string> = {
@@ -325,10 +334,10 @@ export function exportScheduleCSV(
     const dayName = TR_DAYS[date.getDay()];
     const staffName = d.staff?.full_name ?? 'Atanmamış';
     const staffTitle = d.staff?.title ?? '';
-    const deptName = d.departments?.name ?? '';
+    const groupName = d.duty_groups?.name ?? '';
     const status = STATUS_LABELS[d.status] ?? d.status;
     const shiftLabel = SHIFT_LABELS[d.shift_type] ?? d.shift_type;
-    return [d.duty_date, dayName, shiftLabel, staffName, staffTitle, deptName, d.start_time, d.end_time, status];
+    return [d.duty_date, dayName, shiftLabel, staffName, staffTitle, groupName, d.start_time, d.end_time, status];
   });
 
   const csvContent = [
