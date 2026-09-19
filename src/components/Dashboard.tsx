@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { CalendarCheck, Users, Clock, Activity, TrendingUp, TrendingDown, ArrowUpRight, Calendar, CircleCheck as CheckCircle2, Circle as XCircle, CircleAlert as AlertCircle, Loader as Loader2, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import type { DutyWithRelations } from '@/lib/supabase';
+import type { DutyGroup, DutyWithRelations } from '@/lib/supabase';
 
 const statusConfig = {
   active: { label: 'Devam Ediyor', icon: CheckCircle2, cls: 'bg-emerald-50 text-emerald-700' },
@@ -32,7 +32,7 @@ function getInitials(name: string): string {
 }
 
 export default function Dashboard() {
-  const { staff, departments, duties, loading, error } = useDashboardData();
+  const { staff, dutyGroups, duties, loading, error } = useDashboardData();
 
   const stats = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -98,27 +98,38 @@ export default function Dashboard() {
       .slice(0, 8);
   }, [duties]);
 
-  const deptBreakdown = useMemo(() => {
+  const groupBreakdown = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const weekEnd = new Date();
     weekEnd.setDate(weekEnd.getDate() + 7);
     const weekEndStr = weekEnd.toISOString().slice(0, 10);
 
-    const counts = departments.map((dept) => {
+    const counts = dutyGroups.map((grp) => {
       const count = duties.filter(
         (d) =>
-          d.department_id === dept.id &&
+          d.duty_group_id === grp.id &&
           d.duty_date >= today &&
           d.duty_date <= weekEndStr
       ).length;
-      return { dept: dept.name, count, color: dept.color };
+      return { grp: grp.name, count, color: grp.color };
     });
 
     const maxCount = Math.max(...counts.map((c) => c.count), 1);
     return counts
       .map((c) => ({ ...c, pct: Math.round((c.count / maxCount) * 100) }))
       .sort((a, b) => b.count - a.count);
-  }, [departments, duties]);
+  }, [dutyGroups, duties]);
+
+  const groupStaffCounts = useMemo(() => {
+    return dutyGroups.map((grp) => ({
+      id: grp.id,
+      name: grp.name,
+      color: grp.color,
+      maxDuties: grp.max_duties_per_month,
+      minRest: grp.min_rest_hours,
+      staffCount: staff.filter((s) => s.duty_group_id === grp.id && s.active).length,
+    }));
+  }, [dutyGroups, staff]);
 
   const totalThisWeek = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -224,6 +235,47 @@ export default function Dashboard() {
           })}
         </div>
 
+        {/* Duty Group Overview Cards */}
+        {groupStaffCounts.length > 0 && (
+          <div className="animate-fade-in-up">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Nöbet Grupları</h2>
+                <p className="text-sm text-gray-400">Aktif gruplar ve personel durumu</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {groupStaffCounts.map((grp, i) => (
+                <div
+                  key={grp.id}
+                  className="bg-white rounded-xl p-5 border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-300 animate-fade-in-up opacity-0"
+                  style={{ animationDelay: `${i * 70}ms` }}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: grp.color + '20' }}
+                    >
+                      <Users className="w-5 h-5" style={{ color: grp.color }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{grp.name}</p>
+                      <p className="text-xs text-gray-400">Nöbet Grubu</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="text-xs font-medium text-gray-600">{grp.staffCount} personel</span>
+                    </div>
+                    <span className="text-xs text-gray-400">Maks. {grp.maxDuties}/ay</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Two-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Upcoming duties */}
@@ -261,7 +313,7 @@ export default function Dashboard() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{staffName}</p>
                         <p className="text-xs text-gray-400">
-                          {duty.departments?.name ?? '—'} · {formatTimeRange(duty.start_time, duty.end_time)}
+                          {duty.duty_groups?.name ?? '—'} · {formatTimeRange(duty.start_time, duty.end_time)}
                         </p>
                       </div>
                       <span className="text-sm text-gray-500 hidden sm:block">{formatDate(duty.duty_date)}</span>
@@ -276,15 +328,15 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Department breakdown */}
+          {/* Group breakdown */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-base font-semibold text-gray-900">Bölüm Dağılımı</h2>
+            <h2 className="text-base font-semibold text-gray-900">Grup Dağılımı</h2>
             <p className="text-sm text-gray-400 mb-5">Bu haftaki nöbet sayısı</p>
             <div className="space-y-4">
-              {deptBreakdown.map((row, i) => (
-                <div key={row.dept} className="animate-fade-in opacity-0" style={{ animationDelay: `${i * 70}ms` }}>
+              {groupBreakdown.map((row, i) => (
+                <div key={row.grp} className="animate-fade-in opacity-0" style={{ animationDelay: `${i * 70}ms` }}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm font-medium text-gray-700">{row.dept}</span>
+                    <span className="text-sm font-medium text-gray-700">{row.grp}</span>
                     <span className="text-sm font-semibold text-gray-900">{row.count}</span>
                   </div>
                   <div className="h-2 rounded-full bg-gray-100 overflow-hidden">

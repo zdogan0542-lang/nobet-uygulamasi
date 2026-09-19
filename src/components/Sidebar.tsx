@@ -1,15 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  LayoutDashboard,
-  Calendar,
-  Users,
-  FileBarChart,
-  Settings,
-  ShieldPlus,
-  LogOut,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, ChartBar as FileBarChart, Settings, ShieldPlus, LogOut, ChevronLeft, ChevronRight, UsersRound } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { PageId } from '@/App';
 
@@ -46,6 +36,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
     { id: 'dashboard', label: 'Genel Bakış', icon: LayoutDashboard },
     { id: 'schedule', label: 'Nöbet Çizelgesi', icon: Calendar, badge: pendingCount > 0 ? String(pendingCount) : undefined },
     { id: 'staff', label: 'Personel', icon: Users },
+    { id: 'groups', label: 'Nöbet Grupları', icon: UsersRound },
     { id: 'reports', label: 'Raporlar', icon: FileBarChart },
     { id: 'settings', label: 'Ayarlar', icon: Settings },
   ];

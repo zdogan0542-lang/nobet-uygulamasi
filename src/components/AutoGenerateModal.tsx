@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Sparkles, Building2, Sun, Moon, Clock, TriangleAlert, CircleCheck, Loader } from 'lucide-react';
-import type { Department, DutyWithRelations, Staff } from '@/lib/supabase';
+import { X, Sparkles, Users, Sun, Moon, Clock, TriangleAlert, CircleCheck, Loader } from 'lucide-react';
+import type { DutyGroup, DutyWithRelations, Staff } from '@/lib/supabase';
 import type { DutyInput } from '@/hooks/useScheduleData';
 import { generateAutoSchedule, type AutoGenerateResult, type ShiftTypeOption } from '@/lib/scheduleRules';
 
@@ -11,7 +11,7 @@ type AutoGenerateModalProps = {
   onClose: () => void;
   onGenerate: (duties: DutyInput[]) => Promise<{ error: string | null; count: number }>;
   staff: Staff[];
-  departments: Department[];
+  dutyGroups: DutyGroup[];
   duties: DutyWithRelations[];
   year: number;
   month: number;
@@ -22,12 +22,12 @@ export default function AutoGenerateModal({
   onClose,
   onGenerate,
   staff,
-  departments,
+  dutyGroups,
   duties,
   year,
   month,
 }: AutoGenerateModalProps) {
-  const [departmentId, setDepartmentId] = useState<string>('');
+  const [dutyGroupId, setDutyGroupId] = useState<string>('');
   const [shiftTypes, setShiftTypes] = useState<ShiftTypeOption[]>([
     { type: 'gunduz', enabled: true },
     { type: 'gece', enabled: true },
@@ -49,15 +49,15 @@ export default function AutoGenerateModal({
   const monthName = TR_MONTHS[month];
   const eligibleStaff = useMemo(() => {
     let list = staff.filter((s) => s.active);
-    if (departmentId) {
-      list = list.filter((s) => s.department_id === departmentId || s.department_id === null);
+    if (dutyGroupId) {
+      list = list.filter((s) => s.duty_group_id === dutyGroupId || s.duty_group_id === null);
     }
     return list;
-  }, [staff, departmentId]);
+  }, [staff, dutyGroupId]);
 
   function handlePreview() {
     const res = generateAutoSchedule(
-      { year, month, departmentId: departmentId || null, shiftTypes },
+      { year, month, dutyGroupId: dutyGroupId || null, shiftTypes },
       staff,
       duties
     );
@@ -70,7 +70,7 @@ export default function AutoGenerateModal({
     setError(null);
     const inputs: DutyInput[] = result.duties.map((d) => ({
       staff_id: d.staff_id,
-      department_id: d.department_id,
+      duty_group_id: d.duty_group_id,
       duty_date: d.duty_date,
       start_time: d.start_time,
       end_time: d.end_time,
@@ -123,19 +123,19 @@ export default function AutoGenerateModal({
             </div>
           </div>
 
-          {/* Department */}
+          {/* Duty Group */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Bölüm</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Nöbet Grubu</label>
             <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <select
-                value={departmentId}
-                onChange={(e) => { setDepartmentId(e.target.value); setResult(null); }}
+                value={dutyGroupId}
+                onChange={(e) => { setDutyGroupId(e.target.value); setResult(null); }}
                 className="w-full pl-10 pr-3 py-2.5 text-sm rounded-lg bg-gray-50 border border-gray-200 text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
               >
-                <option value="">Tüm Bölümler</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                <option value="">Tüm Gruplar</option>
+                {dutyGroups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
                 ))}
               </select>
             </div>
@@ -159,7 +159,7 @@ export default function AutoGenerateModal({
                     <Icon className="w-4 h-4" />
                     <span className="flex-1 text-left">{shiftLabels[st.type]}</span>
                     <div className={`relative w-9 h-5 rounded-full transition-colors ${st.enabled ? 'bg-brand-500' : 'bg-gray-300'}`}>
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${st.enabled ? 'translate-x-4.5' : 'translate-x-0.5'}`} style={{ transform: st.enabled ? 'translateX(18px)' : 'translateX(2px)' }} />
+                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform`} style={{ transform: st.enabled ? 'translateX(18px)' : 'translateX(2px)' }} />
                     </div>
                   </button>
                 );

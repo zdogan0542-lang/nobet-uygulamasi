@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, User, Building2, Clock, TriangleAlert, Trash2, CalendarDays, CircleCheck } from 'lucide-react';
-import type { Department, DutyWithRelations, ShiftType, Staff } from '@/lib/supabase';
+import { X, User, Users, Clock, TriangleAlert, Trash2, CalendarDays, CircleCheck } from 'lucide-react';
+import type { DutyGroup, DutyWithRelations, ShiftType, Staff } from '@/lib/supabase';
 import type { DutyInput } from '@/hooks/useScheduleData';
 import { validateDuty, type Conflict } from '@/lib/scheduleRules';
 
@@ -12,9 +12,9 @@ export type DutyAssignModalProps = {
   editingDuty: DutyWithRelations | null;
   prefillDate: string | null;
   prefillShiftType: ShiftType | null;
-  prefillDepartmentId: string | null;
+  prefillDutyGroupId: string | null;
   staff: Staff[];
-  departments: Department[];
+  dutyGroups: DutyGroup[];
   duties: DutyWithRelations[];
 };
 
@@ -52,14 +52,14 @@ export default function DutyAssignModal({
   editingDuty,
   prefillDate,
   prefillShiftType,
-  prefillDepartmentId,
+  prefillDutyGroupId,
   staff,
-  departments,
+  dutyGroups,
   duties,
 }: DutyAssignModalProps) {
   const [form, setForm] = useState<DutyInput>({
     staff_id: null,
-    department_id: null,
+    duty_group_id: null,
     duty_date: '',
     start_time: '08:00',
     end_time: '20:00',
@@ -74,7 +74,7 @@ export default function DutyAssignModal({
     if (editingDuty) {
       setForm({
         staff_id: editingDuty.staff_id,
-        department_id: editingDuty.department_id,
+        duty_group_id: editingDuty.duty_group_id,
         duty_date: editingDuty.duty_date,
         start_time: editingDuty.start_time,
         end_time: editingDuty.end_time,
@@ -87,7 +87,7 @@ export default function DutyAssignModal({
       const times = SHIFT_TIMES[shiftType];
       setForm({
         staff_id: null,
-        department_id: prefillDepartmentId,
+        duty_group_id: prefillDutyGroupId,
         duty_date: prefillDate,
         start_time: times.start,
         end_time: times.end,
@@ -97,11 +97,10 @@ export default function DutyAssignModal({
       });
     }
     setSubmitError(null);
-  }, [editingDuty, prefillDate, prefillShiftType, prefillDepartmentId, open]);
+  }, [editingDuty, prefillDate, prefillShiftType, prefillDutyGroupId, open]);
 
   const isEditing = !!editingDuty;
 
-  // Real-time validation using shared rule engine
   const validation = useMemo(() => {
     if (!form.staff_id || !form.duty_date) return null;
     return validateDuty(
@@ -115,16 +114,14 @@ export default function DutyAssignModal({
   const hasError = validation?.hasError ?? false;
   const hasWarning = validation?.hasWarning ?? false;
 
-  // Filter active staff, optionally by department
   const availableStaff = useMemo(() => {
     let list = staff.filter((s) => s.active);
-    if (form.department_id) {
-      list = list.filter((s) => s.department_id === form.department_id || s.department_id === null);
+    if (form.duty_group_id) {
+      list = list.filter((s) => s.duty_group_id === form.duty_group_id || s.duty_group_id === null);
     }
     return list;
-  }, [staff, form.department_id]);
+  }, [staff, form.duty_group_id]);
 
-  // Count this staff's duties in the same month
   const monthlyDutyCount = useMemo(() => {
     if (!form.staff_id || !form.duty_date) return 0;
     const month = form.duty_date.slice(0, 7);
@@ -147,8 +144,8 @@ export default function DutyAssignModal({
   }
 
   async function handleSubmit() {
-    if (!form.department_id) {
-      setSubmitError('Bölüm seçiniz');
+    if (!form.duty_group_id) {
+      setSubmitError('Nöbet grubu seçiniz');
       return;
     }
     if (!form.duty_date) {
@@ -235,19 +232,19 @@ export default function DutyAssignModal({
             </div>
           </div>
 
-          {/* Department */}
+          {/* Duty Group */}
           <div>
-            <label className={labelCls}>Bölüm <span className="text-rose-500">*</span></label>
+            <label className={labelCls}>Nöbet Grubu <span className="text-rose-500">*</span></label>
             <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <select
-                value={form.department_id ?? ''}
-                onChange={(e) => setForm({ ...form, department_id: e.target.value || null })}
+                value={form.duty_group_id ?? ''}
+                onChange={(e) => setForm({ ...form, duty_group_id: e.target.value || null })}
                 className={fieldCls}
               >
-                <option value="">Bölüm seçiniz</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                <option value="">Grup seçiniz</option>
+                {dutyGroups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
                 ))}
               </select>
             </div>

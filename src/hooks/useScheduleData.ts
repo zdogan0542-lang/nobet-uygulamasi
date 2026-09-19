@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { Department, DutyWithRelations, ShiftType, Staff } from '@/lib/supabase';
+import type { DutyGroup, DutyWithRelations, ShiftType, Staff } from '@/lib/supabase';
 
 export type DutyInput = {
   staff_id: string | null;
-  department_id: string | null;
+  duty_group_id: string | null;
   duty_date: string;
   start_time: string;
   end_time: string;
@@ -15,7 +15,7 @@ export type DutyInput = {
 
 export type ScheduleData = {
   staff: Staff[];
-  departments: Department[];
+  dutyGroups: DutyGroup[];
   duties: DutyWithRelations[];
   loading: boolean;
   error: string | null;
@@ -28,7 +28,7 @@ export type ScheduleData = {
 
 export function useScheduleData(): ScheduleData {
   const [staff, setStaff] = useState<Staff[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [dutyGroups, setDutyGroups] = useState<DutyGroup[]>([]);
   const [duties, setDuties] = useState<DutyWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,23 +37,23 @@ export function useScheduleData(): ScheduleData {
     setLoading(true);
     setError(null);
     try {
-      const [{ data: deptData, error: deptError },
+      const [{ data: groupData, error: groupError },
              { data: staffData, error: staffError },
              { data: dutyData, error: dutyError }] = await Promise.all([
-        supabase.from('departments').select('*').order('name'),
+        supabase.from('duty_groups').select('*').order('name'),
         supabase.from('staff').select('*').order('full_name'),
         supabase
           .from('duties')
-          .select('*, staff(*), departments(*)')
+          .select('*, staff(*), duty_groups(*)')
           .order('duty_date', { ascending: true })
           .order('start_time', { ascending: true }),
       ]);
 
-      if (deptError) throw deptError;
+      if (groupError) throw groupError;
       if (staffError) throw staffError;
       if (dutyError) throw dutyError;
 
-      setDepartments(deptData ?? []);
+      setDutyGroups(groupData ?? []);
       setStaff(staffData ?? []);
       setDuties((dutyData ?? []) as DutyWithRelations[]);
     } catch (err) {
@@ -104,7 +104,7 @@ export function useScheduleData(): ScheduleData {
 
   return {
     staff,
-    departments,
+    dutyGroups,
     duties,
     loading,
     error,

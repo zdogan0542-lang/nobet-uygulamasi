@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, User, Mail, Phone, Building2, Stethoscope, CalendarClock, Power } from 'lucide-react';
-import type { Department, Staff } from '@/lib/supabase';
+import { X, User, Mail, Phone, Users, Stethoscope, CalendarClock, Power } from 'lucide-react';
+import type { DutyGroup, Staff } from '@/lib/supabase';
 import type { StaffInput } from '@/hooks/useStaffData';
 
 type StaffFormModalProps = {
@@ -8,7 +8,7 @@ type StaffFormModalProps = {
   onClose: () => void;
   onSubmit: (input: StaffInput) => Promise<{ error: string | null }>;
   editingStaff: Staff | null;
-  departments: Department[];
+  dutyGroups: DutyGroup[];
 };
 
 const ROLE_OPTIONS = [
@@ -27,7 +27,7 @@ const ROLE_OPTIONS = [
 const emptyForm: StaffInput = {
   full_name: '',
   title: 'Uzman Doktor',
-  department_id: null,
+  duty_group_id: null,
   phone: '',
   email: '',
   max_duties_per_month: 10,
@@ -39,7 +39,7 @@ export default function StaffFormModal({
   onClose,
   onSubmit,
   editingStaff,
-  departments,
+  dutyGroups,
 }: StaffFormModalProps) {
   const [form, setForm] = useState<StaffInput>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -50,7 +50,7 @@ export default function StaffFormModal({
       setForm({
         full_name: editingStaff.full_name,
         title: editingStaff.title,
-        department_id: editingStaff.department_id,
+        duty_group_id: editingStaff.duty_group_id,
         phone: editingStaff.phone ?? '',
         email: editingStaff.email ?? '',
         max_duties_per_month: editingStaff.max_duties_per_month,
@@ -140,7 +140,7 @@ export default function StaffFormModal({
             {errors.full_name && <p className={errorCls}>{errors.full_name}</p>}
           </div>
 
-          {/* Role + Department */}
+          {/* Role + Duty Group */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Görev / Ünvan <span className="text-rose-500">*</span></label>
@@ -159,17 +159,17 @@ export default function StaffFormModal({
               {errors.title && <p className={errorCls}>{errors.title}</p>}
             </div>
             <div>
-              <label className={labelCls}>Bölüm</label>
+              <label className={labelCls}>Nöbet Grubu</label>
               <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <select
-                  value={form.department_id ?? ''}
-                  onChange={(e) => setForm({ ...form, department_id: e.target.value || null })}
+                  value={form.duty_group_id ?? ''}
+                  onChange={(e) => setForm({ ...form, duty_group_id: e.target.value || null })}
                   className={fieldCls}
                 >
-                  <option value="">Bölüm seçiniz</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                  <option value="">Grup seçiniz</option>
+                  {dutyGroups.map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
                   ))}
                 </select>
               </div>

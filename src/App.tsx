@@ -4,8 +4,9 @@ import Topbar from '@/components/Topbar';
 import Dashboard from '@/components/Dashboard';
 import StaffManagement from '@/components/StaffManagement';
 import SchedulePage from '@/components/SchedulePage';
+import GroupManagement from '@/components/GroupManagement';
 
-export type PageId = 'dashboard' | 'staff' | 'schedule' | 'reports' | 'settings';
+export type PageId = 'dashboard' | 'staff' | 'schedule' | 'groups' | 'reports' | 'settings';
 
 function App() {
   const [page, setPage] = useState<PageId>('dashboard');
@@ -18,6 +19,7 @@ function App() {
         {page === 'dashboard' && <Dashboard />}
         {page === 'staff' && <StaffManagement />}
         {page === 'schedule' && <SchedulePage />}
+        {page === 'groups' && <GroupManagement />}
         {(page === 'reports' || page === 'settings') && (
           <div className="flex-1 flex items-center justify-center bg-gray-50">
             <div className="text-center">

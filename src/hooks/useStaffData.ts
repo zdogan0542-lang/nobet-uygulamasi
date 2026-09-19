@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { Department, StaffWithDepartment } from '@/lib/supabase';
+import type { DutyGroup, StaffWithDepartment } from '@/lib/supabase';
 
 export type StaffInput = {
   full_name: string;
   title: string;
-  department_id: string | null;
+  duty_group_id: string | null;
   phone: string | null;
   email: string | null;
   max_duties_per_month: number;
@@ -14,7 +14,7 @@ export type StaffInput = {
 
 export function useStaffData() {
   const [staff, setStaff] = useState<StaffWithDepartment[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [dutyGroups, setDutyGroups] = useState<DutyGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,19 +22,19 @@ export function useStaffData() {
     setLoading(true);
     setError(null);
     try {
-      const [{ data: deptData, error: deptError },
+      const [{ data: groupData, error: groupError },
              { data: staffData, error: staffError }] = await Promise.all([
-        supabase.from('departments').select('*').order('name'),
+        supabase.from('duty_groups').select('*').order('name'),
         supabase
           .from('staff')
-          .select('*, departments(*)')
+          .select('*, duty_groups(*)')
           .order('full_name', { ascending: true }),
       ]);
 
-      if (deptError) throw deptError;
+      if (groupError) throw groupError;
       if (staffError) throw staffError;
 
-      setDepartments(deptData ?? []);
+      setDutyGroups(groupData ?? []);
       setStaff((staffData ?? []) as StaffWithDepartment[]);
     } catch (err) {
       if (err instanceof Error) {
@@ -88,7 +88,7 @@ export function useStaffData() {
 
   return {
     staff,
-    departments,
+    dutyGroups,
     loading,
     error,
     createStaff,

@@ -31,7 +31,7 @@ function getInitials(name: string): string {
 export default function StaffManagement() {
   const {
     staff,
-    departments,
+    dutyGroups,
     loading,
     error,
     createStaff,
@@ -41,7 +41,7 @@ export default function StaffManagement() {
   } = useStaffData();
 
   const [search, setSearch] = useState('');
-  const [deptFilter, setDeptFilter] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
@@ -62,11 +62,11 @@ export default function StaffManagement() {
   const filtered = useMemo(() => {
     return staff.filter((s) => {
       if (search && !s.full_name.toLowerCase().includes(search.toLowerCase())) return false;
-      if (deptFilter && s.department_id !== deptFilter) return false;
+      if (groupFilter && s.duty_group_id !== groupFilter) return false;
       if (roleFilter && s.title !== roleFilter) return false;
       return true;
     });
-  }, [staff, search, deptFilter, roleFilter]);
+  }, [staff, search, groupFilter, roleFilter]);
 
   const activeCount = staff.filter((s) => s.active).length;
 
@@ -179,13 +179,13 @@ export default function StaffManagement() {
               <div className="relative">
                 <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <select
-                  value={deptFilter}
-                  onChange={(e) => setDeptFilter(e.target.value)}
+                  value={groupFilter}
+                  onChange={(e) => setGroupFilter(e.target.value)}
                   className="pl-10 pr-8 py-2.5 text-sm rounded-lg bg-gray-50 border border-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all appearance-none cursor-pointer min-w-[160px]"
                 >
-                  <option value="">Tüm Bölümler</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                  <option value="">Tüm Gruplar</option>
+                  {dutyGroups.map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
                   ))}
                 </select>
               </div>
@@ -230,7 +230,7 @@ export default function StaffManagement() {
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/50">
                     <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Personel</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Bölüm</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Nöbet Grubu</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">İletişim</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Aylık Nöbet</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Durum</th>
@@ -256,12 +256,12 @@ export default function StaffManagement() {
                           </div>
                         </div>
                       </td>
-                      {/* Department */}
+                      {/* Duty Group */}
                       <td className="px-4 py-3.5 hidden md:table-cell">
-                        {member.departments ? (
+                        {member.duty_groups ? (
                           <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-50 text-gray-700">
-                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: member.departments.color }} />
-                            {member.departments.name}
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: member.duty_groups.color }} />
+                            {member.duty_groups.name}
                           </span>
                         ) : (
                           <span className="text-xs text-gray-300">—</span>
@@ -338,7 +338,7 @@ export default function StaffManagement() {
         onClose={() => setFormOpen(false)}
         onSubmit={handleSubmit}
         editingStaff={editingStaff}
-        departments={departments}
+        dutyGroups={dutyGroups}
       />
 
       <DeleteConfirmModal
