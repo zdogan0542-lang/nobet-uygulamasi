@@ -172,6 +172,43 @@ const SHIFT_TIMES: Record<string, { start: string; end: string }> = {
   '24saat': { start: '08:00', end: '08:00' },
 };
 
+type DutySpan = { start: Date; end: Date };
+
+function getDutySpan(dateStr: string, startTime: string, endTime: string, shiftType: string): DutySpan {
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  const start = new Date(dateStr + 'T00:00:00');
+  start.setHours(sh, sm, 0, 0);
+  const end = new Date(start);
+  end.setHours(eh, em, 0, 0);
+  if (end <= start || shiftType === 'gece' || shiftType === '24saat') {
+    end.setDate(end.getDate() + 1);
+  }
+  return { start, end };
+}
+
+function hoursBetween(a: Date, b: Date): number {
+  return Math.abs(a.getTime() - b.getTime()) / (1000 * 60 * 60);
+}
+
+function hasRestViolation(
+  candidateSpan: DutySpan,
+  existingSpans: DutySpan[],
+  minRestHours: number
+): boolean {
+  for (const span of existingSpans) {
+    if (hoursBetween(candidateSpan.start, span.end) < minRestHours && span.end <= candidateSpan.start) continue;
+    if (span.end <= candidateSpan.start) {
+      if (hoursBetween(candidateSpan.start, span.end) < minRestHours) return true;
+    } else if (candidateSpan.end <= span.start) {
+      if (hoursBetween(span.start, candidateSpan.end) < minRestHours) return true;
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+
 export type AutoGenerateResult = {
   duties: GeneratedDuty[];
   unassigned: { date: string; shift_type: string; reason: string }[];
@@ -210,6 +247,8 @@ export function generateAutoSchedule(
   const staffDutyDates = new Map<string, Set<string>>();
   // Track monthly counts: staffId -> count
   const staffMonthlyCount = new Map<string, number>();
+  // Track duty spans per staff for rest-hour enforcement
+  const staffDutySpans = new Map<string, DutySpan[]>();
 
   // Pre-populate from existing duties (same month, same group if specified)
   for (const d of existingDuties) {
@@ -218,6 +257,10 @@ export function generateAutoSchedule(
       if (dutyGroupId && d.duty_group_id !== dutyGroupId) continue;
       staffDutyDates.set(d.staff_id, (staffDutyDates.get(d.staff_id) ?? new Set()).add(d.duty_date));
       staffMonthlyCount.set(d.staff_id, (staffMonthlyCount.get(d.staff_id) ?? 0) + 1);
+      const span = getDutySpan(d.duty_date, d.start_time, d.end_time, d.shift_type);
+      const spans = staffDutySpans.get(d.staff_id) ?? [];
+      spans.push(span);
+      staffDutySpans.set(d.staff_id, spans);
     }
   }
 
@@ -244,30 +287,37 @@ export function generateAutoSchedule(
       // Try to find an eligible staff member
       let assigned = false;
       const attempts = eligibleStaff.length;
+      const times = SHIFT_TIMES[shiftType];
 
       for (let attempt = 0; attempt < attempts; attempt++) {
         const idx = shiftIdx[shiftType] % eligibleStaff.length;
         shiftIdx[shiftType]++;
         const candidate = eligibleStaff[idx];
 
-        // Determine the effective monthly limit: group rule overrides staff rule
-        const monthlyLimit = groupRules?.max_duties_per_month ?? candidate.max_duties_per_month;
+        // Determine effective rules: specific group overrides, otherwise use candidate's own group
+        const candidateGroup = candidate.duty_group_id
+          ? dutyGroups.find((g) => g.id === candidate.duty_group_id)
+          : null;
+        const effectiveGroup = groupRules ?? candidateGroup;
+        const monthlyLimit = effectiveGroup?.max_duties_per_month ?? candidate.max_duties_per_month;
 
         // Check monthly limit
         const currentCount = staffMonthlyCount.get(candidate.id) ?? 0;
         if (currentCount >= monthlyLimit) continue;
 
-        // Check consecutive day rule (24h rest)
-        const prevDate = addDays(dateStr, -1);
-        const nextDate = addDays(dateStr, 1);
-        const dutyDates = staffDutyDates.get(candidate.id) ?? new Set<string>();
-        if (dutyDates.has(prevDate) || dutyDates.has(nextDate)) continue;
+        // Determine effective min rest hours
+        const minRestHours = effectiveGroup?.min_rest_hours ?? 24;
+
+        // Check rest-hours rule using actual duty spans
+        const candidateSpan = getDutySpan(dateStr, times.start, times.end, shiftType);
+        const existingSpans = staffDutySpans.get(candidate.id) ?? [];
+        if (hasRestViolation(candidateSpan, existingSpans, minRestHours)) continue;
 
         // Check same-day duplicate
+        const dutyDates = staffDutyDates.get(candidate.id) ?? new Set<string>();
         if (dutyDates.has(dateStr)) continue;
 
         // Assign
-        const times = SHIFT_TIMES[shiftType];
         generated.push({
           staff_id: candidate.id,
           duty_group_id: dutyGroupId ?? candidate.duty_group_id ?? '',
@@ -281,6 +331,9 @@ export function generateAutoSchedule(
 
         staffDutyDates.set(candidate.id, dutyDates.add(dateStr));
         staffMonthlyCount.set(candidate.id, currentCount + 1);
+        const updatedSpans = staffDutySpans.get(candidate.id) ?? [];
+        updatedSpans.push(candidateSpan);
+        staffDutySpans.set(candidate.id, updatedSpans);
         assigned = true;
         break;
       }

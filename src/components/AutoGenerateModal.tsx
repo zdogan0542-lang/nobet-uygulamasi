@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Sparkles, Users, Sun, Moon, Clock, TriangleAlert, CircleCheck, Loader } from 'lucide-react';
+import { X, Sparkles, Users, Sun, Moon, Clock, CalendarClock, TriangleAlert, CircleCheck, Loader } from 'lucide-react';
 import type { DutyGroup, DutyWithRelations, Staff } from '@/lib/supabase';
 import type { DutyInput } from '@/hooks/useScheduleData';
 import { generateAutoSchedule, type AutoGenerateResult, type ShiftTypeOption } from '@/lib/scheduleRules';
@@ -119,7 +119,7 @@ export default function AutoGenerateModal({
             <div>
               <p className="text-sm font-medium text-brand-800">Otomatik Atama</p>
               <p className="text-sm text-brand-700 mt-0.5">
-                Sistem, aktif personel arasında nöbetleri otomatik dağıtır. 24 saat dinlenme kuralı ve aylık nöbet limitleri gözetilir.
+                Sistem, aktif personel arasında nöbetleri otomatik dağıtır. Seçilen grubun aylık maksimum nöbet limiti ve minimum dinlenme süresi kuralları gözetilir.
               </p>
             </div>
           </div>
@@ -140,9 +140,23 @@ export default function AutoGenerateModal({
                 ))}
               </select>
             </div>
+            {dutyGroupId && (() => {
+              const grp = dutyGroups.find((g) => g.id === dutyGroupId);
+              if (!grp) return null;
+              return (
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+                  <span className="inline-flex items-center gap-1.5">
+                    <CalendarClock className="w-3.5 h-3.5 text-gray-400" />
+                    Maks. {grp.max_duties_per_month} nöbet/ay
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-gray-400" />
+                    Min. {grp.min_rest_hours} saat dinlenme
+                  </span>
+                </div>
+              );
+            })()}
           </div>
-
-          {/* Shift types */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Nöbet Türleri</label>
             <div className="space-y-2">
