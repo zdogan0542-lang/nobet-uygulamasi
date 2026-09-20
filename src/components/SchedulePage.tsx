@@ -12,7 +12,6 @@ import {
   Pencil,
   CalendarDays,
   LayoutGrid,
-  Sparkles,
   Download,
   Printer,
 } from 'lucide-react';
@@ -20,7 +19,6 @@ import { useScheduleData } from '@/hooks/useScheduleData';
 import type { DutyInput } from '@/hooks/useScheduleData';
 import type { DutyGroup, DutyWithRelations, ShiftType } from '@/lib/supabase';
 import DutyAssignModal from '@/components/DutyAssignModal';
-import AutoGenerateModal from '@/components/AutoGenerateModal';
 import Toast, { type ToastMessage, type ToastType } from '@/components/Toast';
 import { buildConflictMap, exportScheduleCSV, printSchedule, type Conflict } from '@/lib/scheduleRules';
 
@@ -71,7 +69,7 @@ type ModalState = {
 };
 
 export default function SchedulePage() {
-  const { staff, dutyGroups, duties, loading, error, createDuty, updateDuty, deleteDuty, bulkCreateDuties } = useScheduleData();
+  const { staff, dutyGroups, duties, loading, error, createDuty, updateDuty, deleteDuty } = useScheduleData();
 
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(() => new Date());
@@ -84,7 +82,6 @@ export default function SchedulePage() {
     prefillShiftType: null,
     prefillDutyGroupId: null,
   });
-  const [autoGenOpen, setAutoGenOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
@@ -234,16 +231,6 @@ export default function SchedulePage() {
     return result;
   }
 
-  async function handleAutoGenerate(duties: DutyInput[]): Promise<{ error: string | null; count: number }> {
-    const result = await bulkCreateDuties(duties);
-    if (result.error) {
-      showToast('error', 'Otomatik oluşturma başarısız: ' + result.error);
-    } else {
-      showToast('success', `${result.count} nöbet otomatik atandı`);
-    }
-    return result;
-  }
-
   function handleExportCSV() {
     setExportMenuOpen(false);
     const monthDuties = filteredDuties.filter((d) => {
@@ -333,13 +320,6 @@ export default function SchedulePage() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setAutoGenOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-brand-600 to-brand-700 text-white text-sm font-semibold hover:from-brand-700 hover:to-brand-800 transition-all hover:shadow-lg hover:shadow-brand-600/20 hover:-translate-y-0.5"
-            >
-              <Sparkles className="w-4 h-4" />
-              Otomatik Oluştur
-            </button>
             <div className="relative">
               <button
                 onClick={() => setExportMenuOpen(!exportMenuOpen)}
@@ -667,17 +647,6 @@ export default function SchedulePage() {
         staff={staff}
         dutyGroups={dutyGroups}
         duties={duties}
-      />
-
-      <AutoGenerateModal
-        open={autoGenOpen}
-        onClose={() => setAutoGenOpen(false)}
-        onGenerate={handleAutoGenerate}
-        staff={staff}
-        dutyGroups={dutyGroups}
-        duties={duties}
-        year={currentDate.getFullYear()}
-        month={currentDate.getMonth()}
       />
 
       <Toast toast={toast} onClose={() => setToast(null)} />

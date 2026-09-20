@@ -20,7 +20,7 @@ export function useSwapRequests() {
     try {
       const { data, error: fetchError } = await supabase
         .from('swap_requests')
-        .select('*, duty(*, staff(*), duty_groups(*)), from_staff(*), to_staff(*)')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (fetchError) throw fetchError;
@@ -62,7 +62,7 @@ export function useSwapRequests() {
         .from('swap_requests')
         .update({ status, resolved_at: now, updated_at: now })
         .eq('id', id)
-        .select('*, duty(*, staff(*), duty_groups(*)), from_staff(*), to_staff(*)')
+        .select('*')
         .maybeSingle();
 
       if (updateError) return { error: updateError.message, duty: null };

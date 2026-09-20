@@ -62,6 +62,16 @@ export default function SwapRequestsPage() {
     return swapRequests.filter((r) => r.status === filterStatus);
   }, [swapRequests, filterStatus]);
 
+  // Enrich swap requests with staff/duty data from schedule hook
+  const enrichedRequests = useMemo(() => {
+    return filteredRequests.map((r) => ({
+      ...r,
+      from_staff: r.from_staff ?? staff.find((s) => s.id === r.from_staff_id) ?? null,
+      to_staff: r.to_staff ?? staff.find((s) => s.id === r.to_staff_id) ?? null,
+      duty: r.duty ?? duties.find((d) => d.id === r.duty_id) ?? null,
+    }));
+  }, [filteredRequests, staff, duties]);
+
   // Duties that can be swapped (must have an assigned staff, status not completed)
   const swappableDuties = useMemo(() => {
     return duties
@@ -270,7 +280,7 @@ export default function SwapRequestsPage() {
               </p>
             </div>
           ) : (
-            filteredRequests.map((request, i) => {
+            enrichedRequests.map((request, i) => {
               const cfg = STATUS_CONFIG[request.status];
               const StatusIcon = cfg.icon;
               const duty = request.duty;
