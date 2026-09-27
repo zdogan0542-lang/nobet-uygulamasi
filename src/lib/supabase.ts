@@ -70,3 +70,35 @@ export type SwapRequestWithRelations = SwapRequest & {
   from_staff: Staff | null;
   to_staff: Staff | null;
 };
+
+export type TaskList = {
+  id: string;
+  duty_group_id: string;
+  name: string;
+  description: string | null;
+  cycle_days: number;
+  current_turn_index: number;
+  next_cycle_date: string;
+  sort_order: number;
+  created_at: string;
+};
+
+export type TaskTurn = {
+  id: string;
+  task_list_id: string;
+  label: string;
+  member_ids: string[];
+  position: number;
+  last_completed_at: string | null;
+  completed: boolean;
+  created_at: string;
+};
+
+export type TaskExtra = {
+  id: string;
+  task_list_id: string;
+  label: string | null;
+  performed_by_staff_id: string | null;
+  note: string | null;
+  performed_at: string;
+};

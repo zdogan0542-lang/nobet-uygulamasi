@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Topbar from '@/components/Topbar';
+import BottomNav from '@/components/BottomNav';
 import Dashboard from '@/components/Dashboard';
 import StaffManagement from '@/components/StaffManagement';
 import SchedulePage from '@/components/SchedulePage';
@@ -30,6 +31,7 @@ function App() {
           </div>
         )}
       </div>
+      <BottomNav activePage={page} onNavigate={setPage} />
     </div>
   );
 }
