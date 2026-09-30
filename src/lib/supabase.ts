@@ -1,13 +1,21 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Check .env file.');
-}
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase: SupabaseClient = isSupabaseConfigured
+  ? createClient(supabaseUrl as string, supabaseAnonKey as string)
+  : (new Proxy({} as SupabaseClient, {
+      get(_t, prop) {
+        if (prop === 'then' || prop === 'catch' || prop === 'finally') return undefined;
+        return () => ({
+          data: null,
+          error: { message: 'Supabase bağlantısı yapılandırılmamış. .env dosyasını kontrol edin.' },
+        });
+      },
+    }) as unknown as SupabaseClient);
 
 export type DutyGroup = {
   id: string;
