@@ -8,7 +8,7 @@ import SchedulePage from '@/components/SchedulePage';
 import GroupManagement from '@/components/GroupManagement';
 import SwapRequestsPage from '@/components/SwapRequestsPage';
 
-export type PageId = 'dashboard' | 'staff' | 'schedule' | 'groups' | 'swaps' | 'reports' | 'settings';
+export type PageId = 'dashboard' | 'staff' | 'schedule' | 'groups' | 'swaps';
 
 function App() {
   const [page, setPage] = useState<PageId>('dashboard');
@@ -18,20 +18,15 @@ function App() {
       <Sidebar activePage={page} onNavigate={setPage} />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar />
-        {page === 'dashboard' && <Dashboard />}
-        {page === 'staff' && <StaffManagement />}
-        {page === 'schedule' && <SchedulePage />}
-        {page === 'groups' && <GroupManagement />}
-        {page === 'swaps' && <SwapRequestsPage />}
-        {(page === 'reports' || page === 'settings') && (
-          <div className="flex-1 flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-              <p className="text-sm font-medium text-gray-400">Bu sayfa henüz hazır değil</p>
-            </div>
-          </div>
-        )}
+        <main className="flex-1 overflow-y-auto pb-16 lg:pb-0">
+          {page === 'dashboard' && <Dashboard />}
+          {page === 'staff' && <StaffManagement />}
+          {page === 'schedule' && <SchedulePage />}
+          {page === 'groups' && <GroupManagement />}
+          {page === 'swaps' && <SwapRequestsPage />}
+        </main>
+        <BottomNav activePage={page} onNavigate={setPage} />
       </div>
-      <BottomNav activePage={page} onNavigate={setPage} />
     </div>
   );
 }
