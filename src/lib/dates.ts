@@ -60,9 +60,25 @@ const TR_MONTHS = [
   "Ara",
 ];
 
+const TR_WEEKDAYS = [
+  "Pazar",
+  "Pazartesi",
+  "Salı",
+  "Çarşamba",
+  "Perşembe",
+  "Cuma",
+  "Cumartesi",
+];
+
 export function formatTR(iso: string): string {
   const date = parseISODate(iso);
   return `${date.getUTCDate()} ${TR_MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+}
+
+/** Date with weekday, e.g. "27 Ekim 2026, Salı" */
+export function formatTRWithWeekday(iso: string): string {
+  const date = parseISODate(iso);
+  return `${formatTR(iso)}, ${TR_WEEKDAYS[date.getUTCDay()]}`;
 }
 
 export function todayISO(): string {

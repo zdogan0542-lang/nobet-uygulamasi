@@ -1,6 +1,6 @@
-import { Check, User } from "lucide-react";
+import { Calendar, Check, User } from "lucide-react";
 import { preset } from "../lib/colors";
-import { addDays, advanceCycle, formatTR, todayISO } from "../lib/dates";
+import { addDays, advanceCycle, formatTRWithWeekday, todayISO } from "../lib/dates";
 import type { ListWithAssignees } from "../lib/types";
 
 interface Props {
@@ -26,12 +26,12 @@ export default function DutyCard({ list, onComplete }: Props) {
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${color.hoverBg}`}
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${color.hoverBg}`}
     >
       {/* Left vertical accent strip — list color */}
       <div className={`absolute inset-y-0 left-0 w-1.5 ${color.dot}`} />
 
-      <div className="pl-5 pr-5 py-4">
+      <div className="flex flex-1 flex-col pl-5 pr-5 py-4">
         {/* Title as soft-tinted pill badge (no detached bullet dot) */}
         <div className="flex items-center justify-between gap-3">
           <span
@@ -52,17 +52,17 @@ export default function DutyCard({ list, onComplete }: Props) {
           </span>
         </div>
 
-        {/* Target date — prominent & high-contrast */}
-        <div className="mt-3 rounded-xl bg-slate-900 px-3.5 py-2.5">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">
-            Hedef tarih
-          </p>
-          <p className="mt-0.5 text-base font-bold text-white">
-            {formatTR(endDate)}
-          </p>
-          <p className="mt-0.5 text-xs text-slate-400">
-            {formatTR(startDate)} başlangıçlı {list.cycle_days} günlük döngü
-          </p>
+        {/* Clean light date row with calendar icon */}
+        <div className="mt-3 flex items-start gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3">
+          <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+          <div>
+            <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">
+              Önerilen tarih
+            </p>
+            <p className="mt-0.5 text-sm font-bold text-slate-800">
+              {formatTRWithWeekday(endDate)}
+            </p>
+          </div>
         </div>
 
         {/* Next assignee */}
@@ -71,21 +71,23 @@ export default function DutyCard({ list, onComplete }: Props) {
             <>
               Sıradaki:{" "}
               <span className="font-semibold text-slate-700">{nextAssignee}</span>{" "}
-              <span className="text-slate-400">({formatTR(nextDate)})</span>
+              <span className="text-slate-400">
+                ({formatTRWithWeekday(nextDate)})
+              </span>
             </>
           ) : (
             <span className="text-slate-400">Sırada kimse yok</span>
           )}
         </p>
 
-        {/* Single clean action button */}
+        {/* Outlined clean action button */}
         <button
           type="button"
           disabled={!active}
           onClick={() => onComplete(list.id)}
-          className="mt-3.5 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition-all duration-150 hover:bg-slate-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-3.5 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <Check className="h-4 w-4" />
+          <Check className="h-4 w-4 text-emerald-500" />
           Nöbetimi Tamamla
         </button>
       </div>
