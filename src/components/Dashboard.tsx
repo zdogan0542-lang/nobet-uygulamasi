@@ -71,7 +71,7 @@ export default function Dashboard({ groups, onChanged }: Props) {
                     <DutyCard
                       key={list.id}
                       list={list}
-                      onAdvance={() => handleAdvance(list)}
+                      onComplete={() => handleAdvance(list)}
                     />
                   ))}
                 </div>

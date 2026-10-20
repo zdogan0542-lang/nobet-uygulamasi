@@ -1,18 +1,18 @@
-import { ChevronRight, RotateCw, User, Calendar } from "lucide-react";
+import { Check, User } from "lucide-react";
 import { preset } from "../lib/colors";
 import { addDays, advanceCycle, formatTR, todayISO } from "../lib/dates";
 import type { ListWithAssignees } from "../lib/types";
 
 interface Props {
   list: ListWithAssignees;
-  onAdvance: (id: string) => void;
+  onComplete: (id: string) => void;
 }
 
-export default function DutyCard({ list, onAdvance }: Props) {
+export default function DutyCard({ list, onComplete }: Props) {
   const color = preset(list.color);
   const startDate = list.current_start_date ?? todayISO();
-  const nextDate = advanceCycle(startDate, list.cycle_days);
   const endDate = addDays(startDate, list.cycle_days - 1);
+  const nextDate = advanceCycle(startDate, list.cycle_days);
 
   const nextAssignee = (() => {
     const names = list.assignees.map((a) => a.name);
@@ -22,14 +22,17 @@ export default function DutyCard({ list, onAdvance }: Props) {
     return names[(idx + 1) % names.length];
   })();
 
+  const active = !!list.current_assignee;
+
   return (
     <div
       className={`group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${color.hoverBg}`}
     >
+      {/* Left vertical accent strip — list color */}
       <div className={`absolute inset-y-0 left-0 w-1.5 ${color.dot}`} />
 
       <div className="pl-5 pr-5 py-4">
-        {/* Title pill badge — no detached bullet dot */}
+        {/* Title as soft-tinted pill badge (no detached bullet dot) */}
         <div className="flex items-center justify-between gap-3">
           <span
             className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-bold ${color.pillBg} ${color.pillText}`}
@@ -41,45 +44,50 @@ export default function DutyCard({ list, onAdvance }: Props) {
           </span>
         </div>
 
-        {/* Assignee */}
-        <div className="mt-3 flex items-center gap-2">
+        {/* Current assignee */}
+        <div className="mt-3.5 flex items-center gap-2">
           <User className="h-4 w-4 text-slate-400" />
           <span className="text-sm font-semibold text-slate-800">
             {list.current_assignee ?? "Atanmamış"}
           </span>
         </div>
 
-        {/* Date range */}
-        <div className="mt-1.5 flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-slate-400" />
-          <span className="text-xs text-slate-500">
-            {formatTR(startDate)} – {formatTR(endDate)}
-          </span>
+        {/* Target date — prominent & high-contrast */}
+        <div className="mt-3 rounded-xl bg-slate-900 px-3.5 py-2.5">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">
+            Hedef tarih
+          </p>
+          <p className="mt-0.5 text-base font-bold text-white">
+            {formatTR(endDate)}
+          </p>
+          <p className="mt-0.5 text-xs text-slate-400">
+            {formatTR(startDate)} başlangıçlı {list.cycle_days} günlük döngü
+          </p>
         </div>
 
-        {/* Footer: advance + next */}
-        <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-          <div className="text-xs text-slate-500">
-            {nextAssignee ? (
-              <>
-                Sıradaki:{" "}
-                <span className="font-semibold text-slate-700">{nextAssignee}</span>{" "}
-                <span className="text-slate-400">({formatTR(nextDate)})</span>
-              </>
-            ) : (
-              <span className="text-slate-400">Sırada kimse yok</span>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => onAdvance(list.id)}
-            className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-700"
-          >
-            <RotateCw className="h-3.5 w-3.5" />
-            Nöbeti devret
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        {/* Next assignee */}
+        <p className="mt-3 text-xs text-slate-500">
+          {nextAssignee ? (
+            <>
+              Sıradaki:{" "}
+              <span className="font-semibold text-slate-700">{nextAssignee}</span>{" "}
+              <span className="text-slate-400">({formatTR(nextDate)})</span>
+            </>
+          ) : (
+            <span className="text-slate-400">Sırada kimse yok</span>
+          )}
+        </p>
+
+        {/* Single clean action button */}
+        <button
+          type="button"
+          disabled={!active}
+          onClick={() => onComplete(list.id)}
+          className="mt-3.5 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition-all duration-150 hover:bg-slate-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Check className="h-4 w-4" />
+          Nöbetimi Tamamla
+        </button>
       </div>
     </div>
   );
