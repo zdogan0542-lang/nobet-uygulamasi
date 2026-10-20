@@ -206,6 +206,7 @@ export type TaskList = {
   duty_group_id: string;
   name: string;
   description: string | null;
+  color: string;
   cycle_days: number;
   current_turn_index: number;
   next_cycle_date: string;

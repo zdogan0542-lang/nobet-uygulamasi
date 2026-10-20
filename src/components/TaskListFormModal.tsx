@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ListChecks, AlignLeft, CalendarClock } from 'lucide-react';
+import { X, ListChecks, AlignLeft, CalendarClock, Palette } from 'lucide-react';
 import type { TaskList } from '@/lib/supabase';
 import type { TaskListInput } from '@/hooks/useTaskLists';
 
@@ -10,9 +10,20 @@ type TaskListFormModalProps = {
   editingList: TaskList | null;
 };
 
+const COLOR_OPTIONS = [
+  { name: 'Emerald', value: '#10b981' },
+  { name: 'Indigo', value: '#6366f1' },
+  { name: 'Amber', value: '#f59e0b' },
+  { name: 'Rose', value: '#f43f5e' },
+  { name: 'Cyan', value: '#06b6d4' },
+  { name: 'Violet', value: '#8b5cf6' },
+  { name: 'Slate', value: '#64748b' },
+];
+
 const emptyForm: TaskListInput = {
   name: '',
   description: null,
+  color: '#6366f1',
   cycle_days: 7,
   sort_order: 0,
 };
@@ -32,6 +43,7 @@ export default function TaskListFormModal({
       setForm({
         name: editingList.name,
         description: editingList.description,
+        color: editingList.color,
         cycle_days: editingList.cycle_days,
         sort_order: editingList.sort_order,
       });
@@ -127,6 +139,26 @@ export default function TaskListFormModal({
                 placeholder="Opsiyonel açıklama"
                 className={fieldCls}
               />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Renk</label>
+            <div className="relative">
+              <Palette className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <div className="flex flex-wrap gap-2 pl-10 py-1.5">
+                {COLOR_OPTIONS.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setForm({ ...form, color: c.value })}
+                    className={`w-7 h-7 rounded-lg transition-all ${form.color === c.value ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : 'hover:scale-105'}`}
+                    style={{ backgroundColor: c.value }}
+                    title={c.name}
+                    aria-label={c.name}
+                  />
+                ))}
+              </div>
             </div>
           </div>
 

@@ -5,6 +5,7 @@ import type { TaskList } from '@/lib/supabase';
 export type TaskListInput = {
   name: string;
   description: string | null;
+  color: string;
   cycle_days: number;
   sort_order: number;
 };

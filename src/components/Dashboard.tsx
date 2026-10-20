@@ -124,7 +124,8 @@ export default function Dashboard() {
               return (
                 <div
                   key={rotation.taskList.id}
-                  className="flex-1 min-w-[280px] bg-white rounded-2xl p-6 border border-slate-200 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between"
+                  className="flex-1 min-w-[280px] bg-white rounded-2xl p-6 border border-slate-200 transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between overflow-hidden"
+                  style={{ borderLeftWidth: '6px', borderLeftColor: rotation.group.color }}
                 >
                   <div className="space-y-4">
                     {/* Grup adı — küçük, sade */}
@@ -138,10 +139,16 @@ export default function Dashboard() {
                       </p>
                     </div>
 
-                    {/* Görev adı — büyük, belirgin */}
-                    <h3 className="text-xl font-bold text-slate-900 leading-tight tracking-tight">
-                      {rotation.taskList.name}
-                    </h3>
+                    {/* Görev adı — büyük, belirgin + liste rengi rozeti */}
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className="w-3 h-3 rounded-full shrink-0"
+                        style={{ backgroundColor: rotation.taskList.color }}
+                      />
+                      <h3 className="text-xl font-bold text-slate-900 leading-tight tracking-tight">
+                        {rotation.taskList.name}
+                      </h3>
+                    </div>
 
                     {/* Önerilen Tarih — vurgulu */}
                     <div className="flex items-center gap-2.5 bg-slate-50 rounded-xl px-4 py-3">
@@ -176,7 +183,7 @@ export default function Dashboard() {
                       ) : (
                         <>
                           <CheckCircle2 className="w-4 h-4" />
-                          Nöbeti Tamamla / Teslim Et
+                          Nöbetimi Tamamladım
                         </>
                       )}
                     </button>
